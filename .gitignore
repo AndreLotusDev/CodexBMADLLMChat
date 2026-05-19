@@ -1,3 +1,16 @@
 # BMAD (local only)
 .bmad-core/
 .bmad-*/
+
+# Frontend
+node_modules/
+dist/
+
+# Tauri / Rust build artifacts
+src-tauri/target/
+
+# Environment overrides
+.env.local
+
+# Windows binaries
+*.exe

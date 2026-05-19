@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(md-tree explode *)"
+      "Bash(md-tree explode *)",
+      "PowerShell(rustup --version)",
+      "PowerShell(cargo --version)",
+      "PowerShell(rustc --version)",
+      "PowerShell(node --version)",
+      "PowerShell(npm --version)",
+      "PowerShell(cmd /c '\"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\2022\\\\Community\\\\VC\\\\Auxiliary\\\\Build\\\\vcvars64.bat\" && cargo install tauri-cli --version \"^2\" 2>&1' | Select-String -Pattern \"Compiling|Finished|Installed|error|warning\" | Where-Object { $_ -match \"Installed|Finished|error\" } | Select-Object -Last 10)"
     ]
   }
 }
