@@ -14,6 +14,10 @@ pub enum AppError {
     ConnectionTimeout(u64),
     #[error("Internal error: {0}")]
     Internal(String),
+    #[error("Schema extraction failed: {0}")]
+    ExtractionFailed(String),
+    #[error("Profile not found.")]
+    ProfileNotFound,
 }
 
 impl From<AppError> for String {

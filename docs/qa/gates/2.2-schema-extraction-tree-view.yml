@@ -1,0 +1,106 @@
+schema: 1
+story: '2.2'
+story_title: 'Schema Extraction & Tree View'
+gate: CONCERNS
+status_reason: 'AC #5 unique-constraint extraction is missing (PKs only); pool leak on extraction-failure path; 21 silent unwrap_or_default() calls in row reads. None are blockers, but they should be triaged before merge.'
+reviewer: 'Quinn (Test Architect)'
+updated: '2026-05-19T10:25:00Z'
+
+quality_score: 50
+expires: '2026-06-02T10:25:00Z'
+
+evidence:
+  tests_reviewed: 33
+  risks_identified: 5
+  trace:
+    ac_covered: [2, 3, 4, 6]
+    ac_partial: [1, 5]
+    ac_gaps: [7]
+  notes:
+    - 'AC #1 (auto-loads after successful connection) — implementation requires two clicks (Test → Connect & Browse); semantically debatable.'
+    - 'AC #5 (PKs and unique constraints) — only PK extracted/rendered; UNIQUE constraints absent from data model, SQL, and UI.'
+    - 'AC #7 (<5s for 200 tables) — batch-query architecture is correct, but no test (even #[ignore]) measures elapsed time.'
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Story 2.1 URL-encoding fix correctly applied via PgConnectOptions. Password lifecycle unchanged from Story 2.1. No new ingress vectors.'
+  performance:
+    status: CONCERNS
+    notes: 'AC #7 unvalidated. 5-batch-query design is architecturally correct. Progress event emits twice per table (~401 IPCs for 200 tables) — likely fine but unmeasured.'
+  reliability:
+    status: CONCERNS
+    notes: 'Pool leak: on extract failure, active_pool remains populated; next connect() overwrites it without explicit .close().await. Silent unwrap_or_default() across 21 row reads masks schema drift as empty data.'
+  maintainability:
+    status: PASS
+    notes: 'Code organization mirrors architecture spec. Types align cleanly between Rust and TS. Field selectors used consistently. Thin command handlers.'
+
+top_issues:
+  - id: 'AC5-UNIQUE-MISSING'
+    severity: medium
+    summary: 'Unique constraints not extracted or rendered'
+    description: 'AC #5 requires PKs AND unique constraints to be visually distinguished. Only PRIMARY KEY constraint queried (Q4). No UNIQUE constraint query, no field on PgTable/PgColumn, no UI badge.'
+    refs:
+      - 'src-tauri/src/services/schema_extractor.rs:55-67'
+      - 'src-tauri/src/models.rs:36-44'
+      - 'src/components/schema/ColumnNode.tsx'
+    suggested_owner: dev
+    suggested_action: 'Add Q6 querying constraint_type = UNIQUE; add unique_columns to PgTable; render UQ badge alongside PK in ColumnNode.'
+
+  - id: 'POOL-LEAK-ON-FAILURE'
+    severity: medium
+    summary: 'PgPool leaks if schema extraction fails'
+    description: 'ConnectionManager::connect() stores pool in active_pool BEFORE extract() runs. If extract() fails, the pool persists. Next connect() overwrites active_pool, dropping the old pool without an explicit .close().await call.'
+    refs:
+      - 'src-tauri/src/services/connection_manager.rs:14-29'
+      - 'src-tauri/src/commands/schema.rs:7-19'
+    suggested_owner: dev
+    suggested_action: 'Either (a) close existing active_pool at start of connect(), or (b) wrap extract() in schema.rs so a failure triggers disconnect() before returning the error.'
+
+  - id: 'SILENT-ERROR-SWALLOWING'
+    severity: medium
+    summary: '21 unwrap_or_default() calls silently swallow row-read failures'
+    description: 'schema_extractor.rs uses .try_get(...).unwrap_or_default() throughout. A typed-row mismatch (e.g., PostgreSQL version drift, new information_schema layout) silently produces empty strings/false bools instead of an error.'
+    refs:
+      - 'src-tauri/src/services/schema_extractor.rs:29,97-114,132-136,159-160'
+    suggested_owner: dev
+    suggested_action: 'Replace unwrap_or_default() with ? + map_err(|e| AppError::ExtractionFailed(format!("row read: {}", e))). Loud failure is preferable to phantom-empty schemas.'
+
+  - id: 'AC7-PERF-UNVALIDATED'
+    severity: low
+    summary: '5-second performance NFR has no test, not even ignored'
+    description: 'Story Testing section called for an #[ignore]-flagged integration test stub (per architecture §16.5). It is not present anywhere in src-tauri/tests/ or as a #[cfg(test)] module.'
+    refs:
+      - 'docs/architecture/16-testing-strategy.md:55-67'
+    suggested_owner: dev
+    suggested_action: 'Add #[tokio::test] #[ignore = "requires local PostgreSQL"] async fn extraction_completes_within_5_seconds() stub in src-tauri/src/services/schema_extractor.rs or src-tauri/tests/.'
+
+  - id: 'AC1-AUTO-AMBIGUOUS'
+    severity: low
+    summary: 'Two-step Test → Connect UX may not satisfy "automatic"'
+    description: 'AC #1 says the Schema Browser loads automatically after a successful connection. Current flow requires the user to click Test Connection, see the success banner, then click Connect & Browse Schema separately.'
+    refs:
+      - 'src/components/connection/ConnectionForm.tsx:128-160'
+    suggested_owner: po
+    suggested_action: 'Clarify intent. If automatic is required, collapse to a single "Connect" button that does both. If two-step is acceptable, mark AC #1 as MET with documented UX rationale.'
+
+waiver: { active: false }
+
+recommendations:
+  immediate:
+    - action: 'Add unique-constraint extraction + UI badge to close AC #5'
+      refs: ['src-tauri/src/services/schema_extractor.rs', 'src-tauri/src/models.rs', 'src/components/schema/ColumnNode.tsx']
+    - action: 'Fix pool leak on extraction-failure path'
+      refs: ['src-tauri/src/services/connection_manager.rs', 'src-tauri/src/commands/schema.rs']
+    - action: 'Replace unwrap_or_default() with explicit ExtractionFailed propagation in row reads'
+      refs: ['src-tauri/src/services/schema_extractor.rs']
+
+  future:
+    - action: 'Add #[ignore] integration test stub for AC #7 performance budget'
+      refs: ['src-tauri/src/services/schema_extractor.rs']
+    - action: 'Add tracing::info! observability around SchemaExtractor::extract() (duration + table count) per coding-standards §17.3'
+      refs: ['src-tauri/src/services/schema_extractor.rs']
+    - action: 'Resolve AC #1 UX interpretation with PO; either collapse to one button or document two-step as accepted'
+      refs: ['src/components/connection/ConnectionForm.tsx']
+    - action: 'Add unit test for useTauriEvents hook (registers + unlistens schema_progress)'
+      refs: ['src/hooks/useTauriEvents.ts', 'src/__tests__/']

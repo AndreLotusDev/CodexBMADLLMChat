@@ -1,4 +1,5 @@
 import { FC, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -9,16 +10,21 @@ import type { TauriCommandError } from '@/types'
 import TestConnectionBanner from './TestConnectionBanner'
 
 const ConnectionForm: FC = () => {
+  const navigate = useNavigate()
   const [host, setHost] = useState('')
   const [port, setPort] = useState('5432')
   const [database, setDatabase] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [isConnecting, setIsConnecting] = useState(false)
 
   const connectionStatus = useAppStore(s => s.connectionStatus)
   const setConnectionStatus = useAppStore(s => s.setConnectionStatus)
   const connectionError = useAppStore(s => s.connectionError)
+  const schemaProgress = useAppStore(s => s.schemaProgress)
+  const setSchemaTree = useAppStore(s => s.setSchemaTree)
+  const setSchemaProgress = useAppStore(s => s.setSchemaProgress)
 
   const portNum = parseInt(port, 10)
   const isPortValid = !isNaN(portNum) && portNum >= 1 && portNum <= 65535
@@ -118,6 +124,40 @@ const ConnectionForm: FC = () => {
       </Button>
 
       <TestConnectionBanner status={connectionStatus} errorMessage={connectionError} />
+
+      {connectionStatus === 'connected' && (
+        <div className="flex flex-col gap-2">
+          <Button
+            onClick={async () => {
+              setIsConnecting(true)
+              setSchemaProgress(null)
+              try {
+                const tree = await commands.connectAndExtractSchema({
+                  host: host.trim(),
+                  port: portNum,
+                  database: database.trim(),
+                  username: username.trim(),
+                  password,
+                })
+                setSchemaTree(tree)
+                navigate('/schema')
+              } catch (err) {
+                setConnectionStatus('error', (err as TauriCommandError).message ?? 'Connection failed')
+              } finally {
+                setIsConnecting(false)
+              }
+            }}
+            disabled={isConnecting}
+          >
+            {isConnecting ? 'Loading schema…' : 'Connect & Browse Schema'}
+          </Button>
+          {isConnecting && schemaProgress !== null && (
+            <p className="text-sm text-muted-foreground">
+              Loaded {schemaProgress.loaded}/{schemaProgress.total} tables…
+            </p>
+          )}
+        </div>
+      )}
     </div>
   )
 }

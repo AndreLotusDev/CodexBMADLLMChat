@@ -2,11 +2,37 @@ use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use crate::errors::AppError;
 use crate::models::TestConnectionParams;
 
-pub struct ConnectionManager;
+pub struct ConnectionManager {
+    active_pool: Option<sqlx::PgPool>,
+}
 
 impl ConnectionManager {
     pub fn new() -> Self {
-        Self
+        Self { active_pool: None }
+    }
+
+    pub async fn connect(&mut self, params: &TestConnectionParams) -> Result<sqlx::PgPool, AppError> {
+        let opts = PgConnectOptions::new()
+            .host(&params.host)
+            .port(params.port)
+            .database(&params.database)
+            .username(&params.username)
+            .password(&params.password);
+        let pool = PgPoolOptions::new()
+            .max_connections(5)
+            .acquire_timeout(std::time::Duration::from_secs(10))
+            .connect_with(opts)
+            .await
+            .map_err(map_sqlx_error)?;
+        self.active_pool = Some(pool.clone());
+        Ok(pool)
+    }
+
+    pub async fn disconnect(&mut self) -> Result<(), AppError> {
+        if let Some(pool) = self.active_pool.take() {
+            pool.close().await;
+        }
+        Ok(())
     }
 
     pub async fn test(&self, params: &TestConnectionParams) -> Result<(), AppError> {

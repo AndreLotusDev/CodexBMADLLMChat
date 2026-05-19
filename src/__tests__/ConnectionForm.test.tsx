@@ -1,4 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { invoke } from '@tauri-apps/api/core'
 import ConnectionForm from '../components/connection/ConnectionForm'
 import { useAppStore } from '../store/appStore'
@@ -19,7 +20,7 @@ const fillForm = () => {
 }
 
 it('renders all 5 form fields', () => {
-  render(<ConnectionForm />)
+  render(<MemoryRouter><ConnectionForm /></MemoryRouter>)
   expect(screen.getByLabelText(/host/i)).toBeInTheDocument()
   expect(screen.getByLabelText(/port/i)).toBeInTheDocument()
   expect(screen.getByLabelText(/database/i)).toBeInTheDocument()
@@ -28,18 +29,18 @@ it('renders all 5 form fields', () => {
 })
 
 it('Test Connection button is disabled when fields are empty', () => {
-  render(<ConnectionForm />)
+  render(<MemoryRouter><ConnectionForm /></MemoryRouter>)
   expect(screen.getByRole('button', { name: /test connection/i })).toBeDisabled()
 })
 
 it('Test Connection button is enabled when all fields are filled', () => {
-  render(<ConnectionForm />)
+  render(<MemoryRouter><ConnectionForm /></MemoryRouter>)
   fillForm()
   expect(screen.getByRole('button', { name: /test connection/i })).not.toBeDisabled()
 })
 
 it('password field is masked by default, toggles to text on show button click', () => {
-  render(<ConnectionForm />)
+  render(<MemoryRouter><ConnectionForm /></MemoryRouter>)
   const passwordInput = screen.getByLabelText('Password')
   expect(passwordInput).toHaveAttribute('type', 'password')
   fireEvent.click(screen.getByRole('button', { name: /show password/i }))
@@ -47,7 +48,7 @@ it('password field is masked by default, toggles to text on show button click', 
 })
 
 it('password toggle is bidirectional: text reverts to password on second click', () => {
-  render(<ConnectionForm />)
+  render(<MemoryRouter><ConnectionForm /></MemoryRouter>)
   const passwordInput = screen.getByLabelText('Password')
   fireEvent.click(screen.getByRole('button', { name: /show password/i }))
   expect(passwordInput).toHaveAttribute('type', 'text')
@@ -58,7 +59,7 @@ it('password toggle is bidirectional: text reverts to password on second click',
 it('button shows "Testing…" text while connecting', async () => {
   let resolve: (v: undefined) => void
   mockInvoke.mockReturnValueOnce(new Promise(r => { resolve = r }))
-  render(<ConnectionForm />)
+  render(<MemoryRouter><ConnectionForm /></MemoryRouter>)
   fillForm()
   fireEvent.click(screen.getByRole('button', { name: /test connection/i }))
   await waitFor(() => {
@@ -69,7 +70,7 @@ it('button shows "Testing…" text while connecting', async () => {
 
 it('shows success banner when invoke resolves', async () => {
   mockInvoke.mockResolvedValueOnce(undefined)
-  render(<ConnectionForm />)
+  render(<MemoryRouter><ConnectionForm /></MemoryRouter>)
   fillForm()
   fireEvent.click(screen.getByRole('button', { name: /test connection/i }))
   await waitFor(() => {
@@ -82,7 +83,7 @@ it('shows error banner when invoke rejects with TauriCommandError', async () => 
     code: 'AuthFailed',
     message: 'Authentication failed. Check your username and password.',
   })
-  render(<ConnectionForm />)
+  render(<MemoryRouter><ConnectionForm /></MemoryRouter>)
   fillForm()
   fireEvent.click(screen.getByRole('button', { name: /test connection/i }))
   await waitFor(() => {

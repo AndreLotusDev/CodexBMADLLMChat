@@ -13,5 +13,5 @@ pub async fn test_connection(
     state: State<'_, AppState>,
 ) -> Result<(), AppError> {
     let params = TestConnectionParams { host, port, database, username, password };
-    state.connection_manager.test(&params).await
+    state.connection_manager.lock().await.test(&params).await
 }

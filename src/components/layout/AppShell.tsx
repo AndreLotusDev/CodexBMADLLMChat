@@ -1,8 +1,11 @@
 import { FC, useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
 import NavItem from './NavItem'
+import { useTauriEvents } from '../../hooks/useTauriEvents'
 
 const AppShell: FC = () => {
+  useTauriEvents()
+
   useEffect(() => {
     document.documentElement.classList.add('dark')
   }, [])
