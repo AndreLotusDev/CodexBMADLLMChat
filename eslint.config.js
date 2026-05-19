@@ -38,6 +38,22 @@ export default [
     },
   },
   {
+    files: ['src/__tests__/**/*.{ts,tsx}'],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        describe: 'readonly',
+        it: 'readonly',
+        expect: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+        beforeAll: 'readonly',
+        afterAll: 'readonly',
+        vi: 'readonly',
+      },
+    },
+  },
+  {
     ignores: ['node_modules/**', 'dist/**', 'src-tauri/**', 'public/**'],
   },
 ]

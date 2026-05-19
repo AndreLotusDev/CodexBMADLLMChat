@@ -1,0 +1,65 @@
+schema: 1
+story: "1.2"
+story_title: "Basic Shell UI with Navigation"
+gate: PASS
+status_reason: "All 5 acceptance criteria fully implemented and verified. 5/5 unit tests pass. Clean code with no blocking issues found."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-05-19T09:20:00Z"
+
+waiver: { active: false }
+
+top_issues:
+  - id: "TEST-001"
+    severity: low
+    finding: "AC5 (dark theme) has no unit test — useEffect adding 'dark' class to documentElement is untested"
+    suggested_action: "Add assertion in AppShell.test.tsx that document.documentElement has 'dark' class after render"
+    suggested_owner: dev
+  - id: "A11Y-001"
+    severity: low
+    finding: "Landmark elements <aside> and <main> in AppShell.tsx lack aria-label attributes"
+    suggested_action: "Add aria-label='Navigation' to <aside> and aria-label='Main content' to <main>"
+    suggested_owner: dev
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 0, low: 2 }
+  recommendations:
+    must_fix: []
+    monitor:
+      - "CSP is null in tauri.conf.json — tighten before production"
+      - "Vite esbuild/oxc deprecation warnings from react-babel plugin"
+
+quality_score: 92
+expires: "2026-06-02T00:00:00Z"
+
+evidence:
+  tests_reviewed: 5
+  risks_identified: 2
+  trace:
+    ac_covered: [1, 2, 3, 4]
+    ac_gaps: [5]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "No Tauri IPC calls in this story. Scaffold greet command properly removed. CSP null is pre-existing, not introduced here."
+  performance:
+    status: PASS
+    notes: "No heavy computations, no unnecessary re-renders, pure layout routing."
+  reliability:
+    status: PASS
+    notes: "HashRouter correctly chosen for Tauri asset server. All routes wired per architecture spec."
+  maintainability:
+    status: PASS
+    notes: "Clean FC pattern, shadcn tokens used correctly, cn() for conditional classes, consistent screen pattern."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Add dark theme unit test in AppShell.test.tsx (AC5 coverage)"
+      refs: ["src/__tests__/AppShell.test.tsx", "src/components/layout/AppShell.tsx:6-8"]
+    - action: "Add aria-label to <aside> and <main> in AppShell"
+      refs: ["src/components/layout/AppShell.tsx:12-19"]
+    - action: "Remove orphaned src/App.css"
+      refs: ["src/App.css"]
+    - action: "Set CSP in tauri.conf.json before production"
+      refs: ["src-tauri/tauri.conf.json"]
