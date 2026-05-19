@@ -3,7 +3,7 @@ import { ChevronRight, ChevronDown } from 'lucide-react'
 import type { PgSchema } from '../../types'
 import TableNode from './TableNode'
 
-const SchemaNode: FC<{ schema: PgSchema }> = ({ schema }) => {
+const SchemaNode: FC<{ schema: PgSchema; query?: string }> = ({ schema, query = '' }) => {
   const [expanded, setExpanded] = useState(true)
 
   return (
@@ -19,7 +19,7 @@ const SchemaNode: FC<{ schema: PgSchema }> = ({ schema }) => {
       {expanded && (
         <div className="ml-4">
           {schema.tables.map(table => (
-            <TableNode key={`${schema.name}.${table.name}`} table={table} />
+            <TableNode key={`${schema.name}.${table.name}`} table={table} query={query} />
           ))}
         </div>
       )}

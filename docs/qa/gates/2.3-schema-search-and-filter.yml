@@ -1,0 +1,62 @@
+schema: 1
+story: '2.3'
+story_title: 'Schema Search & Filter'
+gate: PASS
+status_reason: 'Both prior gate issues resolved. CLEAR-RACE fixed via useDebounce.cancel() with a regression test that clears before advancing fake timers. HIGHLIGHT-NO-TEST closed with 5 direct unit tests on HighlightedText (empty, whitespace, match, case-insensitive casing-preserved, no-match). Suite is 60/60 green, lint clean, tsc clean.'
+reviewer: 'Quinn (Test Architect)'
+updated: '2026-05-19T15:45:00Z'
+
+quality_score: 100
+expires: '2026-06-02T15:45:00Z'
+
+evidence:
+  tests_reviewed: 60
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4]
+    ac_partial: []
+    ac_gaps: []
+  notes:
+    - 'AC #1 (real-time filter): SchemaSearchBar.test.tsx asserts local-input-immediate / store-write-after-200ms; useDebounce.test.ts pins debounce semantics; SchemaTree.test.tsx covers the visible filtering effect.'
+    - 'AC #2 (highlighted matches, non-matches hidden): hide-side via SchemaTree.test.tsx; highlight-side now directly asserted via HighlightedText.test.tsx (5 cases) — closes prior HIGHLIGHT-NO-TEST gap.'
+    - 'AC #3 (clear restores tree): SchemaTree.test.tsx restore-on-clear + SchemaSearchBar.test.tsx clear-button bypass + new CLEAR-RACE regression test.'
+    - 'AC #4 (case-insensitive): filterSchemaTree.test.ts ("USER"), SchemaTree.test.tsx ("USERS"), HighlightedText.test.tsx ("user" matching "Users" preserves "User" casing inside <mark>).'
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Unchanged from prior review. Pure client-side string filter, no new invoke() calls, no credentials, no IPC, no SQL/HTML construction (React escapes <mark> text contents).'
+  performance:
+    status: PASS
+    notes: 'Unchanged. filterSchemaTree wrapped in useMemo keyed on (tree, schemaFilter); empty-query short-circuit returns the same tree reference. Input debounced at 200ms. O(schemas × tables × columns) per filter recomputation — adequate for the ≤200-table MVP budget.'
+  reliability:
+    status: PASS
+    notes: 'CLEAR-RACE fixed. useDebounce now exposes a stable .cancel() method (attached to the returned debounced function via useMemo + useCallback, so the function reference itself stays stable across renders). handleClear cancels the pending timer before resetting input and writing "" to the store. Regression test in SchemaSearchBar.test.tsx clears *before* advancing fake timers and asserts schemaFilter stays "" after 200ms — would have failed against the prior implementation.'
+  maintainability:
+    status: PASS
+    notes: 'Clean fix shape — DebouncedFunction<TArgs> is a small intersection type, useMemo wrapping keeps the returned reference stable, .cancel() is a one-line extension. Backward-compatible — call sites that ignore .cancel() continue to work unchanged. No duplication, no dead code.'
+
+top_issues: []
+
+waiver: { active: false }
+
+recommendations:
+  immediate: []
+
+  future:
+    - action: 'Add a direct unit test for useDebounce.cancel() (e.g., "cancel() prevents the pending timer from firing"). Currently the API is exercised end-to-end via the SchemaSearchBar CLEAR-RACE regression test, but a dedicated hook test would pin the contract closer to the implementation.'
+      refs: ['src/__tests__/useDebounce.test.ts']
+    - action: 'If schemaFilter is ever set elsewhere while SchemaSearchBar is mounted, sync local input state from the store (currently local-only — fine for this story, but a constraint future contributors should know). A one-line code comment near the useState would document the intent.'
+      refs: ['src/components/schema/SchemaSearchBar.tsx']
+    - action: 'Consider showing a result count ("3 tables match") near the search bar — UX polish, not in scope for this story.'
+      refs: ['src/components/schema/SchemaSearchBar.tsx', 'src/components/schema/SchemaTree.tsx']
+
+history:
+  - updated: '2026-05-19T10:55:00Z'
+    gate: CONCERNS
+    quality_score: 90
+    summary: 'Initial review — all 4 ACs pass, 54/54 tests green, but flagged CLEAR-RACE (medium reliability) and HIGHLIGHT-NO-TEST (low coverage gap).'
+  - updated: '2026-05-19T15:45:00Z'
+    gate: PASS
+    quality_score: 100
+    summary: 'Re-review after dev fix pass. CLEAR-RACE fixed with useDebounce.cancel() + regression test; HIGHLIGHT-NO-TEST closed with 5-case HighlightedText.test.tsx. 60/60 tests green, lint+tsc clean.'

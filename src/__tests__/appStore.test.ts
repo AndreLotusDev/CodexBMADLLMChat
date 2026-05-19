@@ -1,7 +1,13 @@
 import { useAppStore } from '../store/appStore'
 
 beforeEach(() => {
-  useAppStore.setState({ connectionStatus: 'idle', connectionError: null, schemaTree: null, schemaProgress: null })
+  useAppStore.setState({
+    connectionStatus: 'idle',
+    connectionError: null,
+    schemaTree: null,
+    schemaProgress: null,
+    schemaFilter: '',
+  })
 })
 
 it('setConnectionStatus("connecting") sets status and clears error', () => {
@@ -41,4 +47,15 @@ it('clearConnection() resets schemaTree to null', () => {
 it('setSchemaProgress sets progress values', () => {
   useAppStore.getState().setSchemaProgress({ loaded: 5, total: 10 })
   expect(useAppStore.getState().schemaProgress).toEqual({ loaded: 5, total: 10 })
+})
+
+it('setSchemaFilter updates schemaFilter', () => {
+  useAppStore.getState().setSchemaFilter('users')
+  expect(useAppStore.getState().schemaFilter).toBe('users')
+})
+
+it('clearConnection() resets schemaFilter to empty string', () => {
+  useAppStore.setState({ schemaFilter: 'users' })
+  useAppStore.getState().clearConnection()
+  expect(useAppStore.getState().schemaFilter).toBe('')
 })

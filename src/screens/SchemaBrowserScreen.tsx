@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { commands } from '@/commands'
 import { useAppStore } from '@/store/appStore'
 import SchemaTree from '@/components/schema/SchemaTree'
+import SchemaSearchBar from '@/components/schema/SchemaSearchBar'
 
 const SchemaBrowserScreen: FC = () => {
   const navigate = useNavigate()
@@ -24,6 +25,8 @@ const SchemaBrowserScreen: FC = () => {
           Disconnect
         </Button>
       </header>
+
+      {schemaTree !== null && <SchemaSearchBar />}
 
       <div className="flex-1 overflow-auto">
         {schemaTree === null ? (
