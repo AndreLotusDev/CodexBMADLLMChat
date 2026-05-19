@@ -1,0 +1,103 @@
+schema: 1
+story: '1.1'
+story_title: 'Initialize Tauri + React Project Scaffold'
+gate: CONCERNS
+status_reason: >
+  Scaffold is well-implemented with legitimate deviations documented. One IPC gateway
+  violation (App.tsx direct Tauri import) was corrected during review. Two items remain
+  for dev: remove out-of-scope buildAnnotationKey() from utils.ts and confirm AC2 live
+  window manually.
+reviewer: 'Quinn (Test Architect)'
+updated: '2026-05-18T00:00:00Z'
+
+top_issues:
+  - id: 'ipc-gateway-violation'
+    severity: high
+    status: fixed
+    title: 'App.tsx imported @tauri-apps/api/core directly'
+    detail: >
+      The scaffold-generated App.tsx bypassed the IPC gateway by importing invoke
+      from @tauri-apps/api/core. Fixed during QA review — import now routes through
+      src/commands/index.ts per coding standards §17.1.
+    suggested_owner: dev
+    refs:
+      - 'src/App.tsx'
+      - 'src/commands/index.ts'
+
+  - id: 'utils-out-of-scope'
+    severity: medium
+    status: open
+    title: 'buildAnnotationKey() added prematurely to utils.ts'
+    detail: >
+      Story 1.1 specifies utils.ts as a stub only. The function references domain
+      concepts (connectionId, schemaName, tableName, columnName) that belong in
+      Story 1.3+. Leaving it misrepresents the 1.1 baseline and creates false coupling.
+      Remove the function body; keep the stub comment.
+    suggested_owner: dev
+    refs:
+      - 'src/lib/utils.ts'
+
+  - id: 'ac2-indirect-verification'
+    severity: low
+    status: open
+    title: 'AC2 live window launch not directly verified'
+    detail: >
+      npm run tauri dev was validated indirectly via successful production build.
+      Manual confirmation that the native window renders placeholder UI should be
+      done before marking the story Done.
+    suggested_owner: dev
+    refs: []
+
+waiver:
+  active: false
+
+quality_score: 80
+
+expires: '2026-06-01T00:00:00Z'
+
+evidence:
+  tests_reviewed: 0
+  risks_identified: 3
+  trace:
+    ac_covered: [1, 3, 4, 5, 6]
+    ac_gaps: [2]  # AC2 verified indirectly only — manual confirmation pending
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: >
+      No security-critical code in scope. credential_store.rs stub correctly
+      documents OS-keyring-only password storage. No sensitive data paths established.
+  performance:
+    status: PASS
+    notes: >
+      No runtime logic. Vite HMR on fixed port 1420 with strictPort is correct
+      Tauri dev setup. passWithNoTests prevents false CI failures.
+  reliability:
+    status: PASS
+    notes: >
+      AppError enum stub with Display + Error impl establishes correct error
+      propagation contract for future stories. .expect() in tauri Builder::run()
+      is scaffold boilerplate — acceptable for fatal startup failure.
+  maintainability:
+    status: CONCERNS
+    notes: >
+      buildAnnotationKey() in utils.ts is out-of-scope and muddies the 1.1
+      baseline. Cargo.toml has placeholder metadata. ESLint lint script uses
+      --ext flag silently ignored by ESLint 9 flat config.
+
+recommendations:
+  immediate:
+    - action: 'Remove buildAnnotationKey() from src/lib/utils.ts (keep stub comment only)'
+      refs: ['src/lib/utils.ts']
+    - action: 'Run npm run tauri dev and manually confirm native window opens'
+      refs: []
+    - action: 'Add src/App.tsx to Dev Agent Record File List (modified during QA)'
+      refs: ['docs/stories/1.1.story.md']
+  future:
+    - action: 'Update Cargo.toml description and authors from scaffold placeholders'
+      refs: ['src-tauri/Cargo.toml']
+    - action: 'Simplify npm run lint script to "eslint src" (--ext ignored in ESLint 9)'
+      refs: ['package.json']
+    - action: 'Replace bare invoke re-export in commands/index.ts with typed wrappers as commands are added'
+      refs: ['src/commands/index.ts']
