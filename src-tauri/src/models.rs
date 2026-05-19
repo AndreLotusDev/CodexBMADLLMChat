@@ -1,4 +1,11 @@
-// Data models — Rust structs mirrored by TypeScript interfaces in src/types/index.ts.
-// serde rename_all = "camelCase" handles the TS↔Rust naming bridge.
+use serde::Deserialize;
 
-// TODO: populate with ConnectionProfile, SchemaData, Annotation, etc. in Story 1.3+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TestConnectionParams {
+    pub host: String,
+    pub port: u16,
+    pub database: String,
+    pub username: String,
+    pub password: String,
+}

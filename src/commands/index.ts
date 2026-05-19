@@ -1,10 +1,7 @@
-// IPC Gateway — ALL invoke() calls go through this module.
-// No component should ever import @tauri-apps/api directly.
-// Stub for Story 1.1 — commands added in subsequent stories.
 import { invoke } from '@tauri-apps/api/core'
+import type { TestConnectionParams } from '../types'
 
-// Re-export invoke so consumers only depend on this gateway
-export { invoke }
-
-// Future commands will be exported as typed wrappers here, e.g.:
-// export const commands = { ... }
+export const commands = {
+  testConnection: (params: TestConnectionParams): Promise<void> =>
+    invoke<void>('test_connection', { ...params }),
+}
