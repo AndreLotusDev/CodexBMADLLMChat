@@ -1,4 +1,4 @@
-use sqlx::postgres::PgPoolOptions;
+use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use crate::errors::AppError;
 use crate::models::TestConnectionParams;
 
@@ -10,14 +10,16 @@ impl ConnectionManager {
     }
 
     pub async fn test(&self, params: &TestConnectionParams) -> Result<(), AppError> {
-        let url = format!(
-            "postgresql://{}:{}@{}:{}/{}",
-            params.username, params.password, params.host, params.port, params.database
-        );
+        let options = PgConnectOptions::new()
+            .host(&params.host)
+            .port(params.port)
+            .database(&params.database)
+            .username(&params.username)
+            .password(&params.password);
         let pool = PgPoolOptions::new()
             .acquire_timeout(std::time::Duration::from_secs(5))
             .max_connections(1)
-            .connect(&url)
+            .connect_with(options)
             .await
             .map_err(map_sqlx_error)?;
         pool.close().await;

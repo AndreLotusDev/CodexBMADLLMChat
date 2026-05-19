@@ -46,6 +46,27 @@ it('password field is masked by default, toggles to text on show button click', 
   expect(passwordInput).toHaveAttribute('type', 'text')
 })
 
+it('password toggle is bidirectional: text reverts to password on second click', () => {
+  render(<ConnectionForm />)
+  const passwordInput = screen.getByLabelText('Password')
+  fireEvent.click(screen.getByRole('button', { name: /show password/i }))
+  expect(passwordInput).toHaveAttribute('type', 'text')
+  fireEvent.click(screen.getByRole('button', { name: /hide password/i }))
+  expect(passwordInput).toHaveAttribute('type', 'password')
+})
+
+it('button shows "Testing…" text while connecting', async () => {
+  let resolve: (v: undefined) => void
+  mockInvoke.mockReturnValueOnce(new Promise(r => { resolve = r }))
+  render(<ConnectionForm />)
+  fillForm()
+  fireEvent.click(screen.getByRole('button', { name: /test connection/i }))
+  await waitFor(() => {
+    expect(screen.getByRole('button', { name: /testing/i })).toBeInTheDocument()
+  })
+  resolve!(undefined)
+})
+
 it('shows success banner when invoke resolves', async () => {
   mockInvoke.mockResolvedValueOnce(undefined)
   render(<ConnectionForm />)
