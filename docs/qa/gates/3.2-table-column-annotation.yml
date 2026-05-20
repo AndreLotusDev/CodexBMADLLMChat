@@ -1,0 +1,63 @@
+schema: 1
+story: '3.2'
+story_title: 'Table & Column Annotation'
+gate: PASS
+status_reason: 'All 5 ACs implemented; data shape matches architecture §4.3 verbatim; 116/116 tests pass and all four gates (test, tsc, lint, build) are clean. Three minor polish items recommended for backlog; none blocking.'
+reviewer: 'Quinn (Test Architect)'
+updated: '2026-05-20T08:40:00Z'
+
+quality_score: 100
+expires: '2026-06-03T08:40:00Z'
+
+evidence:
+  tests_reviewed: 24
+  risks_identified: 3
+  trace:
+    ac_covered: [1, 2, 3, 5]
+    ac_gaps: []
+    ac_deferred: [4]  # AC #4 (prompt inclusion) is cross-story — Story 3.3 closes the visible-in-prompt assertion. This story produces the data layer with the canonical key format Story 3.3 will consume.
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'No new IPC surface; no boundary input; crypto.randomUUID() is appropriate for in-memory IDs. textarea content double-capped (DOM maxLength=500 + handler slice).'
+  performance:
+    status: PASS
+    notes: 'Per-keystroke store writes are O(1) Map clones on a bounded collection. Debounce intentionally deferred to Epic 4.2 when IPC saves land — documented per architecture §17.4.'
+  reliability:
+    status: PASS
+    notes: 'removeAnnotation early-returns when key absent (avoids spurious re-renders). clearConnection correctly resets annotations Map. Field-selector discipline maintained.'
+  maintainability:
+    status: PASS
+    notes: 'buildAnnotationKey convention (§17.1) honored throughout — no inline annotation-key construction in components. Code follows established Story 3.1 patterns (clone-then-set, MessageSquareText icon, aria-label as marker signal).'
+
+top_issues:
+  - id: 'TEST-3.2-001'
+    severity: low
+    finding: 'The defense-in-depth `.slice(0, 500)` clamp in `AnnotationInput.tsx:28` has no direct test. The dev notes call out that this exists precisely because Vitest jsdom may not enforce DOM `maxLength` on `fireEvent.change`. A test asserting that a programmatic `value: "x".repeat(501)` produces a stored text of length 500 would lock in the defensive code path.'
+    suggested_action: 'Add one test to `AnnotationInput.test.tsx`: fireEvent.change with 501-char value, assert `useAppStore.getState().annotations.get(key)?.text.length === 500`.'
+    suggested_owner: dev
+    refs: ['src/components/schema/AnnotationInput.tsx:28', 'src/__tests__/AnnotationInput.test.tsx']
+  - id: 'TEST-3.2-002'
+    severity: low
+    finding: 'AC #3 visual-marker tests assert the aria-label change (`Add annotation` → `Edit annotation`) but never assert the className change (`text-muted-foreground/60` → `text-yellow-500`). The actual visual mark is unverified. The story dev notes explicitly chose this trade-off ("avoids brittle Tailwind-class assertions") — acceptable, but worth a single class-presence assertion to guarantee the visual contract.'
+    suggested_action: 'Optional polish: add one assertion per node (Table & Column) that the icon button has `text-yellow-500` in its className when annotated. Or capture a visual snapshot when a snapshot tool is added later.'
+    suggested_owner: dev
+    refs: ['src/components/schema/TableNode.tsx:61', 'src/components/schema/ColumnNode.tsx:57']
+  - id: 'MNT-3.2-001'
+    severity: low
+    finding: '`e.stopPropagation()` on the annotation icon click handlers (`TableNode.tsx:57`, `ColumnNode.tsx:53`) is documented in the story as defensive — the expand button is a sibling, not a parent. The DOM is now in place; the stopPropagation is dead code. Harmless, but the comment-by-implication ("just in case") rots over time.'
+    suggested_action: 'Optional cleanup: remove the `e.stopPropagation()` calls and the surrounding handler arrow wrappers can collapse to `onClick={() => setAnnotating(v => !v)}`. Verify with the existing TableNode/ColumnNode tests.'
+    suggested_owner: dev
+    refs: ['src/components/schema/TableNode.tsx:57', 'src/components/schema/ColumnNode.tsx:53']
+
+recommendations:
+  immediate: []  # Nothing blocks "Ready for Done"
+  future:
+    - action: 'When Story 3.3 (prompt generation) lands, add an integration test asserting that an annotation in the store renders into the produced prompt — this closes the cross-story half of AC #4.'
+      refs: ['docs/stories/3.2.story.md#ac-4', 'docs/architecture/6-components.md']
+    - action: 'When Epic 4.2 wires SQLite IPC, add the useDebounce wrapper around upsertAnnotation per architecture §17.4 — the in-memory synchronous write here becomes the inner debounced callback.'
+      refs: ['src/components/schema/AnnotationInput.tsx', 'docs/architecture/17-coding-standards.md#174-key-react-patterns']
+
+waiver:
+  active: false

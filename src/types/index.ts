@@ -59,3 +59,15 @@ export interface ForeignKeyRef {
   table: string
   column: string
 }
+
+export interface Annotation {
+  id: string
+  connectionProfileId: string
+  schemaName: string
+  tableName: string
+  columnName: string | null
+  text: string
+  updatedAt: string
+}
+
+export type AnnotationKey = `${string}.${string}.${string | ''}`

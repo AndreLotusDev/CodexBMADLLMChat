@@ -1,5 +1,5 @@
 import { useAppStore } from '../store/appStore'
-import type { PgColumn, PgTable } from '../types'
+import type { Annotation, PgColumn, PgTable } from '../types'
 
 beforeEach(() => {
   useAppStore.setState({
@@ -10,6 +10,7 @@ beforeEach(() => {
     schemaFilter: '',
     selectedTables: new Set<string>(),
     selectedColumns: new Set<string>(),
+    annotations: new Map<string, Annotation>(),
   })
 })
 
@@ -184,5 +185,57 @@ describe('selection actions', () => {
     const { selectedTables, selectedColumns } = useAppStore.getState()
     expect(selectedTables.size).toBe(0)
     expect(selectedColumns.size).toBe(0)
+  })
+})
+
+describe('annotation actions', () => {
+  const makeAnno = (overrides: Partial<Annotation> = {}): Annotation => ({
+    id: 'anno-1',
+    connectionProfileId: '',
+    schemaName: 'public',
+    tableName: 'users',
+    columnName: null,
+    text: 'a table annotation',
+    updatedAt: '2026-05-19T00:00:00.000Z',
+    ...overrides,
+  })
+
+  it('setAnnotation adds the entry and round-trips text + updatedAt', () => {
+    const anno = makeAnno({ text: 'first', updatedAt: '2026-05-19T01:00:00.000Z' })
+    useAppStore.getState().setAnnotation('public.users.', anno)
+    const stored = useAppStore.getState().annotations.get('public.users.')
+    expect(stored).toBeDefined()
+    expect(stored?.text).toBe('first')
+    expect(stored?.updatedAt).toBe('2026-05-19T01:00:00.000Z')
+  })
+
+  it('setAnnotation overwrites a prior entry under the same key (Map size stays 1)', () => {
+    useAppStore.getState().setAnnotation('public.users.', makeAnno({ text: 'first' }))
+    useAppStore.getState().setAnnotation('public.users.', makeAnno({ text: 'second' }))
+    const { annotations } = useAppStore.getState()
+    expect(annotations.size).toBe(1)
+    expect(annotations.get('public.users.')?.text).toBe('second')
+  })
+
+  it('removeAnnotation deletes the entry', () => {
+    useAppStore.getState().setAnnotation('public.users.', makeAnno())
+    useAppStore.getState().removeAnnotation('public.users.')
+    expect(useAppStore.getState().annotations.has('public.users.')).toBe(false)
+  })
+
+  it('removeAnnotation on a missing key is a no-op', () => {
+    const before = useAppStore.getState().annotations
+    useAppStore.getState().removeAnnotation('public.does_not_exist.')
+    const after = useAppStore.getState().annotations
+    expect(after.size).toBe(0)
+    expect(after).toBe(before)
+  })
+
+  it('clearConnection resets annotations to an empty Map', () => {
+    useAppStore.setState({
+      annotations: new Map([['public.users.', makeAnno()]]),
+    })
+    useAppStore.getState().clearConnection()
+    expect(useAppStore.getState().annotations.size).toBe(0)
   })
 })

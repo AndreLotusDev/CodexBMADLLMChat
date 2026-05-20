@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { PgColumn, PgTable, SchemaTree } from '../types'
+import type { Annotation, PgColumn, PgTable, SchemaTree } from '../types'
 
 interface AppState {
   connectionStatus: 'idle' | 'connecting' | 'connected' | 'error'
@@ -9,6 +9,7 @@ interface AppState {
   schemaFilter: string
   selectedTables: Set<string>
   selectedColumns: Set<string>
+  annotations: Map<string, Annotation>
   setConnectionStatus: (status: AppState['connectionStatus'], error?: string) => void
   clearConnection: () => void
   setSchemaTree: (tree: SchemaTree | null) => void
@@ -18,6 +19,8 @@ interface AppState {
   toggleColumn: (schema: string, table: string, column: string) => void
   selectAllInSchema: (schemaName: string, tables: PgTable[]) => void
   deselectAllInSchema: (schemaName: string) => void
+  setAnnotation: (key: string, annotation: Annotation) => void
+  removeAnnotation: (key: string) => void
 }
 
 export const useAppStore = create<AppState>()((set) => ({
@@ -28,6 +31,7 @@ export const useAppStore = create<AppState>()((set) => ({
   schemaFilter: '',
   selectedTables: new Set<string>(),
   selectedColumns: new Set<string>(),
+  annotations: new Map<string, Annotation>(),
   setConnectionStatus: (status, error) =>
     set({ connectionStatus: status, connectionError: error ?? null }),
   clearConnection: () =>
@@ -39,6 +43,7 @@ export const useAppStore = create<AppState>()((set) => ({
       schemaFilter: '',
       selectedTables: new Set<string>(),
       selectedColumns: new Set<string>(),
+      annotations: new Map<string, Annotation>(),
     }),
   setSchemaTree: (tree) => set({ schemaTree: tree }),
   setSchemaProgress: (progress) => set({ schemaProgress: progress }),
@@ -112,5 +117,18 @@ export const useAppStore = create<AppState>()((set) => ({
         if (!key.startsWith(prefix)) nextColumns.add(key)
       }
       return { selectedTables: nextTables, selectedColumns: nextColumns }
+    }),
+  setAnnotation: (key, annotation) =>
+    set((state) => {
+      const next = new Map(state.annotations)
+      next.set(key, annotation)
+      return { annotations: next }
+    }),
+  removeAnnotation: (key) =>
+    set((state) => {
+      if (!state.annotations.has(key)) return {}
+      const next = new Map(state.annotations)
+      next.delete(key)
+      return { annotations: next }
     }),
 }))
