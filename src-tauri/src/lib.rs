@@ -10,12 +10,14 @@ use std::sync::{Arc, Mutex};
 use services::connection_manager::ConnectionManager;
 use services::schema_extractor::SchemaExtractor;
 use repositories::profile_repository::ProfileRepository;
+use repositories::annotation_repository::AnnotationRepository;
 use credential_store::CredentialStore;
 
 pub struct AppState {
     pub connection_manager: tokio::sync::Mutex<ConnectionManager>,
     pub schema_extractor: SchemaExtractor,
     pub profile_repo: ProfileRepository,
+    pub annotation_repo: AnnotationRepository,
     pub credential_store: CredentialStore,
 }
 
@@ -37,6 +39,7 @@ pub fn run() {
                 connection_manager: tokio::sync::Mutex::new(ConnectionManager::new()),
                 schema_extractor: SchemaExtractor::new(),
                 profile_repo: ProfileRepository::new(conn_arc.clone()),
+                annotation_repo: AnnotationRepository::new(conn_arc.clone()),
                 credential_store: CredentialStore::new("schemalift"),
             };
             app.manage(app_state);
@@ -50,6 +53,9 @@ pub fn run() {
             commands::profiles::list_profiles,
             commands::profiles::save_profile,
             commands::profiles::delete_profile,
+            commands::annotations::load_annotations,
+            commands::annotations::upsert_annotation,
+            commands::annotations::delete_annotation,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

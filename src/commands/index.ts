@@ -1,5 +1,12 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { ConnectionProfile, SaveProfileParams, SchemaTree, TestConnectionParams } from '../types'
+import type {
+  Annotation,
+  ConnectionProfile,
+  SaveProfileParams,
+  SchemaTree,
+  TestConnectionParams,
+  UpsertAnnotationParams,
+} from '../types'
 
 export const commands = {
   testConnection: (params: TestConnectionParams): Promise<void> =>
@@ -16,4 +23,10 @@ export const commands = {
     invoke<void>('delete_profile', { profileId }),
   connectWithSavedProfile: (profileId: string): Promise<SchemaTree> =>
     invoke<SchemaTree>('connect_with_saved_profile', { profileId }),
+  loadAnnotations: (profileId: string): Promise<Annotation[]> =>
+    invoke<Annotation[]>('load_annotations', { profileId }),
+  upsertAnnotation: (params: UpsertAnnotationParams): Promise<Annotation> =>
+    invoke<Annotation>('upsert_annotation', { ...params }),
+  deleteAnnotation: (annotationId: string): Promise<void> =>
+    invoke<void>('delete_annotation', { annotationId }),
 }

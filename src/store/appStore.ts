@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { Annotation, ConnectionProfile, PgColumn, PgTable, PromptBlock, SchemaTree } from '../types'
+import { buildAnnotationKey } from '../lib/utils'
 
 interface AppState {
   connectionStatus: 'idle' | 'connecting' | 'connected' | 'error'
@@ -24,6 +25,7 @@ interface AppState {
   selectAllInSchema: (schemaName: string, tables: PgTable[]) => void
   deselectAllInSchema: (schemaName: string) => void
   setAnnotation: (key: string, annotation: Annotation) => void
+  setAnnotations: (annotations: Annotation[]) => void
   removeAnnotation: (key: string) => void
   setPrompt: (prompt: PromptBlock | null) => void
   setIsGenerating: (v: boolean) => void
@@ -139,6 +141,14 @@ export const useAppStore = create<AppState>()((set) => ({
     set((state) => {
       const next = new Map(state.annotations)
       next.set(key, annotation)
+      return { annotations: next }
+    }),
+  setAnnotations: (annotations) =>
+    set(() => {
+      const next = new Map<string, Annotation>()
+      for (const a of annotations) {
+        next.set(buildAnnotationKey(a.schemaName, a.tableName, a.columnName), a)
+      }
       return { annotations: next }
     }),
   removeAnnotation: (key) =>

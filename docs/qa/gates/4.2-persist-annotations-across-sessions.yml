@@ -1,0 +1,120 @@
+schema: 1
+story: '4.2'
+story_title: 'Persist Annotations Across Sessions'
+gate: CONCERNS
+status_reason: >-
+  Implementation is complete and well-engineered; frontend gates pass exactly as
+  claimed (191/191 tests, lint clean, tsc clean, 245.82 kB / 78.48 kB gz build).
+  However, backend `cargo check` / `cargo test` remain unrunnable on this host
+  due to the same documented MSVC SDK gap from Story 4.1, so the 10 unit tests
+  (including the AC4 FK-cascade test) and the AC5 manual end-to-end flow are
+  unverified locally. A small constraint-error routing ambiguity in
+  `AnnotationRepository::upsert` is the only code-level concern.
+reviewer: 'Quinn (Test Architect)'
+updated: '2026-05-20T12:15:00Z'
+
+top_issues:
+  - id: 'BE-TESTS-UNVERIFIED'
+    severity: medium
+    summary: 'Backend `cargo check` / `cargo test` cannot run on this host (MSVC SDK gap inherited from Story 4.1).'
+    refs:
+      - 'src-tauri/src/repositories/annotation_repository.rs'
+    suggested_owner: dev
+    suggested_action: >-
+      Re-run `cargo check` and `cargo test --lib` in CI or on a properly
+      toolchained Windows host before merge. The Rust code is syntactically
+      consistent with the Story 4.1 pattern and reviewed clean.
+
+  - id: 'AC5-MANUAL-ONLY'
+    severity: low
+    summary: >-
+      AC5 (annotations survive app restart) has no automated test; Task 20's 12
+      manual verification steps remain unchecked.
+    refs:
+      - 'docs/stories/4.2.story.md#task-20'
+    suggested_owner: dev
+    suggested_action: >-
+      Execute Task 20 manually once the MSVC toolchain is available
+      (`npm run tauri dev`). Same MVP gap accepted in Story 4.1.
+
+  - id: 'UPSERT-CONSTRAINT-ROUTING'
+    severity: low
+    summary: >-
+      `AnnotationRepository::upsert` routes every `ConstraintViolation`
+      (FK and CHECK) to `AppError::ProfileNotFound`. If the SQL `text_max_length`
+      CHECK ever fires (despite the pre-check), the user would see
+      "Profile not found" instead of "Annotation too long."
+    refs:
+      - 'src-tauri/src/repositories/annotation_repository.rs:66-71'
+    suggested_owner: dev
+    suggested_action: >-
+      Discriminate on `sf.extended_code` (`SQLITE_CONSTRAINT_FOREIGNKEY` vs
+      `SQLITE_CONSTRAINT_CHECK`) before mapping to `ProfileNotFound`. In practice
+      `chars().count()` and SQLite's `length()` agree on Unicode codepoints, so
+      this is defense-in-depth rather than a live bug.
+
+waiver: { active: false }
+
+quality_score: 70
+expires: '2026-06-03T12:15:00Z'
+
+evidence:
+  tests_reviewed: 23   # 13 AnnotationInput + 2 setAnnotations + 2 ConnectionForm + 10 backend (reviewed, not executed)
+  risks_identified: 3
+  trace:
+    ac_covered: [1, 2, 3, 4]
+    ac_gaps: [5]   # No automated coverage — manual verification path only (MVP-accepted, mirrors Story 4.1).
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: >-
+      All SQL parameterized via rusqlite `params!`. Annotation text is user
+      content, not credentials — safe to log. No secret leakage. FK + per-connection
+      `PRAGMA foreign_keys = ON` enforces cascade deletes.
+  performance:
+    status: PASS
+    notes: >-
+      Single-row upserts on indexed `(connection_profile_id, schema_name, table_name)`
+      are sub-millisecond. 500 ms debounce matches architecture §17.4. Frontend
+      bundle delta vs Story 4.1 baseline: +1.02 kB raw / +0.31 kB gz, well within
+      the ≤5 kB envelope.
+  reliability:
+    status: CONCERNS
+    notes: >-
+      IPC failure paths are intentionally silent (degraded-but-usable), which is
+      acceptable for MVP. The in-memory annotation is retained on upsert error so
+      the user doesn't lose work. However, AC5 (restart-survival) has no automated
+      test, and backend tests including the AC4 cascade verification are blocked
+      from running locally.
+  maintainability:
+    status: PASS
+    notes: >-
+      Code closely mirrors the Story 4.1 `ProfileRepository` pattern. The Story 4.1
+      deviation from architecture §11.4 (Mutex omitted in favor of inner
+      `Arc<Mutex<Connection>>`) is intentionally and consistently retained.
+      `useDebounce` hook reused from a prior 3.x story and extended additively
+      with `.flush()`. Test file naming and structure are consistent.
+
+recommendations:
+  immediate: []
+  future:
+    - action: >-
+        Discriminate `SQLITE_CONSTRAINT_FOREIGNKEY` from
+        `SQLITE_CONSTRAINT_CHECK` in `AnnotationRepository::upsert`.
+      refs: ['src-tauri/src/repositories/annotation_repository.rs:66-71']
+    - action: >-
+        Add an `AppError::AnnotationNotFound` variant so
+        `AnnotationRepository::delete` does not surface as `Internal("Annotation not found")`.
+      refs: ['src-tauri/src/repositories/annotation_repository.rs:99']
+    - action: >-
+        Add a Vitest case that primes an annotation with a real
+        `connectionProfileId`, modifies text, and asserts the upsert path uses
+        `existing.id` as the stable id round-trip — covers the
+        existing-server-annotation update path that the current 5 IPC tests
+        only touch indirectly via the delete-on-empty case.
+      refs: ['src/__tests__/AnnotationInput.test.tsx']
+    - action: >-
+        Once `tracing` lands in a later story, log annotation IPC operations
+        (event + id + row count) without raw text content.
+      refs: ['src-tauri/src/repositories/annotation_repository.rs']

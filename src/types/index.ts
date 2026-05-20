@@ -70,6 +70,14 @@ export interface Annotation {
   updatedAt: string
 }
 
+export interface UpsertAnnotationParams {
+  profileId: string
+  schemaName: string
+  tableName: string
+  columnName: string | null
+  text: string
+}
+
 export type AnnotationKey = `${string}.${string}.${string | ''}`
 
 export interface PromptBlock {

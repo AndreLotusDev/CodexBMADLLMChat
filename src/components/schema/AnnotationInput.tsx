@@ -1,7 +1,9 @@
-import { FC, useState, ChangeEvent } from 'react'
+import { FC, useState, ChangeEvent, useEffect, useRef } from 'react'
 import type { Annotation } from '../../types'
 import { useAppStore } from '../../store/appStore'
 import { buildAnnotationKey } from '../../lib/utils'
+import { useDebounce } from '../../hooks/useDebounce'
+import { commands } from '../../commands'
 
 interface AnnotationInputProps {
   schemaName: string
@@ -19,28 +21,64 @@ const AnnotationInput: FC<AnnotationInputProps> = ({
   const annotations = useAppStore(s => s.annotations)
   const setAnnotation = useAppStore(s => s.setAnnotation)
   const removeAnnotation = useAppStore(s => s.removeAnnotation)
+  const activeProfile = useAppStore(s => s.activeProfile)
 
   const key = buildAnnotationKey(schemaName, tableName, columnName)
   const existing = annotations.get(key)
   const [text, setText] = useState(existing?.text ?? '')
+
+  // Tracks the id of the latest server-persisted annotation so we can delete it after
+  // the optimistic `removeAnnotation` has already cleared the Zustand entry.
+  const persistedIdRef = useRef<string | null>(
+    existing !== undefined && existing.connectionProfileId !== '' ? existing.id : null,
+  )
+
+  const debouncedPersist = useDebounce((nextText: string) => {
+    if (activeProfile === null) return
+    if (nextText.trim() === '') {
+      const idToDelete = persistedIdRef.current
+      if (idToDelete !== null) {
+        persistedIdRef.current = null
+        void commands.deleteAnnotation(idToDelete)
+          .then(() => removeAnnotation(key))
+          .catch(() => { /* silent — keep in-memory state */ })
+      }
+      return
+    }
+    void commands.upsertAnnotation({
+      profileId: activeProfile.id,
+      schemaName,
+      tableName,
+      columnName,
+      text: nextText,
+    })
+      .then((saved) => {
+        persistedIdRef.current = saved.id
+        setAnnotation(key, saved)
+      })
+      .catch(() => { /* silent — keep optimistic in-memory annotation */ })
+  }, 500)
+
+  useEffect(() => () => { debouncedPersist.flush() }, [debouncedPersist])
 
   const handleChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     const nextText = e.target.value.slice(0, 500)
     setText(nextText)
     if (nextText.trim() === '') {
       removeAnnotation(key)
-      return
+    } else {
+      const next: Annotation = {
+        id: existing?.id ?? crypto.randomUUID(),
+        connectionProfileId: activeProfile?.id ?? '',
+        schemaName,
+        tableName,
+        columnName,
+        text: nextText,
+        updatedAt: new Date().toISOString(),
+      }
+      setAnnotation(key, next)
     }
-    const next: Annotation = {
-      id: existing?.id ?? crypto.randomUUID(),
-      connectionProfileId: '',
-      schemaName,
-      tableName,
-      columnName,
-      text: nextText,
-      updatedAt: new Date().toISOString(),
-    }
-    setAnnotation(key, next)
+    debouncedPersist(nextText)
   }
 
   return (

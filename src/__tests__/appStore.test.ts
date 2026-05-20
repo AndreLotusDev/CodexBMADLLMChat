@@ -242,6 +242,39 @@ describe('annotation actions', () => {
     useAppStore.getState().clearConnection()
     expect(useAppStore.getState().annotations.size).toBe(0)
   })
+
+  it('setAnnotations replaces the existing map and builds keys via buildAnnotationKey', () => {
+    useAppStore.getState().setAnnotation('public.users.', makeAnno({ id: 'old-a' }))
+    useAppStore.getState().setAnnotation(
+      'public.orders.',
+      makeAnno({ id: 'old-b', tableName: 'orders' }),
+    )
+
+    const incoming = makeAnno({
+      id: 'new-id',
+      schemaName: 'public',
+      tableName: 'users',
+      columnName: 'email',
+      text: 'fresh from db',
+    })
+    useAppStore.getState().setAnnotations([incoming])
+
+    const { annotations } = useAppStore.getState()
+    expect(annotations.size).toBe(1)
+    expect(annotations.get('public.users.email')?.id).toBe('new-id')
+    expect(annotations.get('public.users.email')?.text).toBe('fresh from db')
+    // Old entries are gone (replacement semantics, not merge).
+    expect(annotations.has('public.users.')).toBe(false)
+    expect(annotations.has('public.orders.')).toBe(false)
+  })
+
+  it('setAnnotations([]) clears the map', () => {
+    useAppStore.setState({
+      annotations: new Map([['public.users.', makeAnno()]]),
+    })
+    useAppStore.getState().setAnnotations([])
+    expect(useAppStore.getState().annotations.size).toBe(0)
+  })
 })
 
 describe('prompt actions', () => {

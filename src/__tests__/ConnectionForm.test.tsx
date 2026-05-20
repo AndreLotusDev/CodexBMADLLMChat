@@ -3,7 +3,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { invoke } from '@tauri-apps/api/core'
 import ConnectionForm from '../components/connection/ConnectionForm'
 import { useAppStore } from '../store/appStore'
-import type { ConnectionProfile } from '../types'
+import type { Annotation, ConnectionProfile } from '../types'
 
 const mockInvoke = invoke as ReturnType<typeof vi.fn>
 
@@ -200,5 +200,85 @@ describe('saved profile integration', () => {
       expect(screen.getByRole('button', { name: /connect & browse schema/i })).toBeInTheDocument()
     })
     expect(screen.queryByText(/save this connection/i)).toBeNull()
+  })
+
+  it('connect with saved profile loads annotations and hydrates the store before navigating', async () => {
+    const loaded: Annotation[] = [
+      {
+        id: 'a1',
+        connectionProfileId: fixtureA.id,
+        schemaName: 'public',
+        tableName: 'users',
+        columnName: null,
+        text: 'table anno',
+        updatedAt: '2026-05-20T00:00:00Z',
+      },
+      {
+        id: 'a2',
+        connectionProfileId: fixtureA.id,
+        schemaName: 'public',
+        tableName: 'users',
+        columnName: 'email',
+        text: 'column anno',
+        updatedAt: '2026-05-20T00:00:00Z',
+      },
+    ]
+    useAppStore.setState({
+      savedProfiles: [fixtureA],
+      activeProfile: fixtureA,
+      annotations: new Map(),
+    })
+    mockInvoke.mockImplementation(async (cmd: string, args?: Record<string, unknown>) => {
+      if (cmd === 'list_profiles') return [fixtureA]
+      if (cmd === 'connect_with_saved_profile') return { schemas: [] }
+      if (cmd === 'load_annotations') {
+        expect(args).toEqual({ profileId: fixtureA.id })
+        return loaded
+      }
+      return undefined
+    })
+
+    render(<MemoryRouter><ConnectionForm /></MemoryRouter>)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /connect & browse schema/i })).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByRole('button', { name: /connect & browse schema/i }))
+
+    await waitFor(() => {
+      expect(useAppStore.getState().annotations.size).toBe(2)
+    })
+    expect(useAppStore.getState().annotations.get('public.users.')?.id).toBe('a1')
+    expect(useAppStore.getState().annotations.get('public.users.email')?.id).toBe('a2')
+    expect(mockInvoke).toHaveBeenCalledWith('load_annotations', { profileId: fixtureA.id })
+  })
+
+  it('connect with manual entry does NOT call load_annotations', async () => {
+    useAppStore.setState({
+      activeProfile: null,
+      connectionStatus: 'connected',
+      annotations: new Map(),
+    })
+    mockInvoke.mockImplementation(async (cmd: string) => {
+      if (cmd === 'list_profiles') return []
+      if (cmd === 'connect_and_extract_schema') return { schemas: [] }
+      return undefined
+    })
+
+    render(<MemoryRouter><ConnectionForm /></MemoryRouter>)
+    fillForm()
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /connect & browse schema/i })).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByRole('button', { name: /connect & browse schema/i }))
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith('connect_and_extract_schema', expect.anything())
+    })
+    // Drain any pending microtasks so a stray load_annotations would have time to fire.
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(mockInvoke).not.toHaveBeenCalledWith('load_annotations', expect.anything())
   })
 })

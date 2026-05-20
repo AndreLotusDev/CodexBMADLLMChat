@@ -83,3 +83,25 @@ pub struct ForeignKeyRef {
     pub table: String,
     pub column: String,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Annotation {
+    pub id: String,
+    pub connection_profile_id: String,
+    pub schema_name: String,
+    pub table_name: String,
+    pub column_name: Option<String>,
+    pub text: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpsertAnnotationParams {
+    pub profile_id: String,
+    pub schema_name: String,
+    pub table_name: String,
+    pub column_name: Option<String>,
+    pub text: String,
+}

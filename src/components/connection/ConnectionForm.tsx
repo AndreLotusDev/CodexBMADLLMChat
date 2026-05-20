@@ -186,6 +186,14 @@ const ConnectionForm: FC = () => {
                       password,
                     })
                 setSchemaTree(tree)
+                if (activeProfile !== null) {
+                  try {
+                    const loaded = await commands.loadAnnotations(activeProfile.id)
+                    useAppStore.getState().setAnnotations(loaded)
+                  } catch {
+                    // Non-fatal: connection succeeded; annotations missing is a degraded but usable state.
+                  }
+                }
                 navigate('/schema')
               } catch (err) {
                 setConnectionStatus('error', (err as TauriCommandError).message ?? 'Connection failed')

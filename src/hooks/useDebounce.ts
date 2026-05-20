@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 
 export type DebouncedFunction<TArgs extends unknown[]> = ((...args: TArgs) => void) & {
   cancel: () => void
+  flush: () => void
 }
 
 export function useDebounce<TArgs extends unknown[]>(
@@ -10,6 +11,7 @@ export function useDebounce<TArgs extends unknown[]>(
 ): DebouncedFunction<TArgs> {
   const fnRef = useRef(fn)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastArgsRef = useRef<TArgs | null>(null)
 
   useEffect(() => {
     fnRef.current = fn
@@ -29,12 +31,25 @@ export function useDebounce<TArgs extends unknown[]>(
     }
   }, [])
 
+  const flush = useCallback(() => {
+    if (timerRef.current !== null && lastArgsRef.current !== null) {
+      clearTimeout(timerRef.current)
+      timerRef.current = null
+      fnRef.current(...lastArgsRef.current)
+    }
+  }, [])
+
   return useMemo(() => {
     const debounced = ((...args: TArgs) => {
+      lastArgsRef.current = args
       if (timerRef.current) clearTimeout(timerRef.current)
-      timerRef.current = setTimeout(() => fnRef.current(...args), delayMs)
+      timerRef.current = setTimeout(() => {
+        timerRef.current = null
+        fnRef.current(...args)
+      }, delayMs)
     }) as DebouncedFunction<TArgs>
     debounced.cancel = cancel
+    debounced.flush = flush
     return debounced
-  }, [delayMs, cancel])
+  }, [delayMs, cancel, flush])
 }

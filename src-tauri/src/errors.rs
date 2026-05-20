@@ -24,6 +24,8 @@ pub enum AppError {
     CredentialStoreError(String),
     #[error("Failed to retrieve credentials: {0}")]
     CredentialNotFound(String),
+    #[error("Annotation text exceeds 500 character limit.")]
+    AnnotationTooLong,
 }
 
 impl From<AppError> for String {
