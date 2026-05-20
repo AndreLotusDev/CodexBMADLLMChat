@@ -40,3 +40,12 @@ pub async fn delete_profile(
     state.credential_store.delete(&profile_id)?;
     Ok(())
 }
+
+#[tauri::command]
+pub async fn rename_profile(
+    profile_id: String,
+    new_name: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    state.profile_repo.rename(&profile_id, &new_name)
+}

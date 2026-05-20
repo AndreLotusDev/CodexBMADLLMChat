@@ -21,6 +21,8 @@ export const commands = {
     invoke<ConnectionProfile>('save_profile', { ...params }),
   deleteProfile: (profileId: string): Promise<void> =>
     invoke<void>('delete_profile', { profileId }),
+  renameProfile: (profileId: string, newName: string): Promise<void> =>
+    invoke<void>('rename_profile', { profileId, newName }),
   connectWithSavedProfile: (profileId: string): Promise<SchemaTree> =>
     invoke<SchemaTree>('connect_with_saved_profile', { profileId }),
   loadAnnotations: (profileId: string): Promise<Annotation[]> =>

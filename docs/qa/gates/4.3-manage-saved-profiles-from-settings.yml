@@ -1,0 +1,119 @@
+schema: 1
+story: '4.3'
+story_title: 'Manage Saved Profiles from Settings Screen'
+gate: CONCERNS
+status_reason: 'Implementation is solid and frontend gates are green (219/219 tests, lint clean, tsc clean). Backend rename tests have not been executed locally due to the documented MSVC toolchain gap, and the manual E2E (Task 19) that validates AC 4''s full credential + annotation cascade from the Settings UI is fully deferred.'
+reviewer: 'Quinn (Test Architect)'
+updated: '2026-05-20T14:05:00Z'
+
+quality_score: 90
+expires: '2026-06-03T14:05:00Z'
+
+evidence:
+  tests_reviewed: 219
+  risks_identified: 7
+  trace:
+    ac_covered: [1, 2, 3, 4, 5]
+    ac_gaps: []
+    notes: |
+      All 5 ACs have at least one automated test. AC 4's cascade behavior is
+      delegated to existing Story 4.1 (credential cleanup) and Story 4.2
+      (FK-cascade annotations) backend tests plus the deferred Task 19 manual
+      E2E — see reliability notes.
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'No new credentials touched. SQL fully parameterized via rusqlite::params!. React renders profile names as escaped children only — no XSS surface. Defense-in-depth empty-name check at backend covers callers bypassing UI short-circuit.'
+  performance:
+    status: PASS
+    notes: 'Single-row UPDATE on PRIMARY KEY is sub-millisecond. Bundle delta +5.42 kB / +1.36 kB gz — marginally over the story''s ~5 KB target but well within desktop-app budget.'
+  reliability:
+    status: CONCERNS
+    notes: 'AC 4''s full cascade chain (list removal + Credential Manager cleanup + annotation deletion) has no single automated test from the Settings entry point. Coverage is split across Story 4.1, Story 4.2, and a deferred Task 19 manual E2E. Strongly recommend running Task 19 before treating AC 4 as fully validated at runtime.'
+  maintainability:
+    status: PASS
+    notes: 'Components small and focused; props well-typed; tests mirror existing patterns; no comments-as-narration. File organization matches architecture §10.1 exactly.'
+
+top_issues:
+  - id: 'BE-TESTS-UNEXECUTED'
+    severity: medium
+    category: 'test-coverage'
+    description: 'The six new ProfileRepository::rename unit tests have not been executed on this machine — `cargo check` and `cargo test` are blocked by the same MSVC SDK / VS 2026 Insiders gap that affected Stories 4.1 and 4.2. Tests are logically sound and follow the existing in-memory-SQLite pattern, but source-level confidence is not execution evidence.'
+    refs:
+      - 'src-tauri/src/repositories/profile_repository.rs:242-293'
+    suggested_action: 'Run `cargo test --lib` in CI or on a clean-toolchain Windows host before merge.'
+    suggested_owner: dev
+  - id: 'E2E-DEFERRED'
+    severity: medium
+    category: 'verification'
+    description: 'Task 19 manual E2E is fully deferred — all sub-bullets unchecked. AC 4''s full chain (Settings → Delete → confirm → DB row gone + Credential Manager entry gone + annotations cascaded) has no end-to-end runtime validation in this story. The underlying behavior is covered by Story 4.1 (`delete_profile` handler) and Story 4.2 (`delete_profile_cascades_to_annotations` backend test), but the cumulative chain from the new UI has not been exercised.'
+    refs:
+      - 'docs/stories/4.3.story.md:484-507'
+    suggested_action: 'Execute Task 19 on a properly-toolchained Windows host after CI green: launch `npm run tauri dev`, save 2-3 profiles + annotate columns on profile A, delete A from Settings, then verify (a) Credential Manager entry for `schemalift / <uuid>` is gone, (b) `SELECT COUNT(*) FROM annotations WHERE connection_profile_id = ''<uuid>''` returns 0.'
+    suggested_owner: dev
+  - id: 'COMMIT-REENTRY'
+    severity: low
+    category: 'code-quality'
+    description: 'ProfileListItem.commit has no re-entry guard. Clicking the Save (Check) button while the Input is focused fires onBlur → commit() synchronously, then the click handler → commit() again before React re-renders with isSaving=true. Both await commands.renameProfile(...) calls fly in parallel. Backend is idempotent so it''s not user-visible, but it''s an extra round trip.'
+    refs:
+      - 'src/components/settings/ProfileListItem.tsx:24-37'
+    suggested_action: 'Add `if (isSaving) return` at the top of commit(), or track in-flight state via useRef.'
+    suggested_owner: dev
+  - id: 'DIALOG-CALLBACK-IDENTITY'
+    severity: low
+    category: 'performance'
+    description: 'ProfileList passes a fresh onCancel closure to DeleteProfileDialog on every render. DeleteProfileDialog''s useEffect depends on onCancel, so the window keydown listener is removed and re-added on every parent render. No correctness issue; minor inefficiency.'
+    refs:
+      - 'src/components/settings/ProfileList.tsx:63'
+      - 'src/components/settings/DeleteProfileDialog.tsx:14-19'
+    suggested_action: 'Wrap the onCancel closure in useCallback.'
+    suggested_owner: dev
+  - id: 'SILENT-LOAD-ERROR'
+    severity: low
+    category: 'observability'
+    description: 'ProfileList mount-load swallows list_profiles errors silently (`.catch(() => {})`). On IPC failure the user sees the empty-state message — misleading.'
+    refs:
+      - 'src/components/settings/ProfileList.tsx:17-20'
+    suggested_action: 'At minimum log to console.error; ideally surface a retry affordance.'
+    suggested_owner: dev
+  - id: 'NO-NAME-LENGTH-CAP'
+    severity: low
+    category: 'robustness'
+    description: 'No upper bound on profile name length. Schema has `CHECK (length(trim(name)) > 0)` but no max; frontend Input has no maxLength. Renaming to a multi-MB string would succeed.'
+    refs:
+      - 'src-tauri/src/migrations/001_initial.sql:15'
+      - 'src/components/settings/ProfileListItem.tsx:49-58'
+    suggested_action: 'Future story: cap at 128 chars in both layers (Input maxLength + a new CHECK constraint behind a migration).'
+    suggested_owner: po
+  - id: 'EDIT-DELETE-RACE'
+    severity: low
+    category: 'edge-case'
+    description: 'Behavior is undefined if the user opens inline-edit on a row, then clicks Delete on the same row before committing. The pending blur-commit on the Input may IPC just as the delete dialog opens.'
+    refs:
+      - 'src/components/settings/ProfileListItem.tsx'
+    suggested_action: 'Either cancel the in-progress edit on Delete click, or block Delete while editing. Not a critical scenario.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+recommendations:
+  immediate:
+    - action: 'Run backend `cargo test --lib` in CI to execute the six new rename_* tests'
+      refs:
+        - 'src-tauri/src/repositories/profile_repository.rs:242-293'
+    - action: 'Execute Task 19 manual E2E to validate AC 4''s full cascade from the Settings UI'
+      refs:
+        - 'docs/stories/4.3.story.md:484-507'
+  future:
+    - action: 'Add re-entry guard to ProfileListItem.commit'
+      refs:
+        - 'src/components/settings/ProfileListItem.tsx:24-37'
+    - action: 'Cap profile name length at both UI (Input maxLength) and schema (CHECK constraint) layers'
+      refs:
+        - 'src-tauri/src/migrations/001_initial.sql:15'
+        - 'src/components/settings/ProfileListItem.tsx'
+    - action: 'Surface list_profiles load failures instead of silent empty-state'
+      refs:
+        - 'src/components/settings/ProfileList.tsx:17-20'

@@ -53,6 +53,7 @@ pub fn run() {
             commands::profiles::list_profiles,
             commands::profiles::save_profile,
             commands::profiles::delete_profile,
+            commands::profiles::rename_profile,
             commands::annotations::load_annotations,
             commands::annotations::upsert_annotation,
             commands::annotations::delete_annotation,

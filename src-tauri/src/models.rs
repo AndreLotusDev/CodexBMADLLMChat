@@ -33,6 +33,13 @@ pub struct SaveProfileParams {
     pub password: String,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenameProfileParams {
+    pub profile_id: String,
+    pub new_name: String,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SchemaTree {

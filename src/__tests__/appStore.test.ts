@@ -377,4 +377,32 @@ describe('profiles slice', () => {
     expect(useAppStore.getState().activeProfile).toBeNull()
     expect(useAppStore.getState().savedProfiles).toEqual([fixtureA, fixtureB])
   })
+
+  it('renameSavedProfile updates the matching profile name in savedProfiles', () => {
+    useAppStore.setState({ savedProfiles: [fixtureA, fixtureB] })
+    useAppStore.getState().renameSavedProfile(fixtureA.id, 'Renamed')
+    const { savedProfiles } = useAppStore.getState()
+    expect(savedProfiles[0].name).toBe('Renamed')
+    expect(savedProfiles[1].name).toBe(fixtureB.name)
+  })
+
+  it('renameSavedProfile also updates activeProfile when it matches the renamed id', () => {
+    useAppStore.setState({ savedProfiles: [fixtureA], activeProfile: fixtureA })
+    useAppStore.getState().renameSavedProfile(fixtureA.id, 'Renamed')
+    expect(useAppStore.getState().activeProfile?.name).toBe('Renamed')
+  })
+
+  it('renameSavedProfile does NOT touch activeProfile when a different profile is renamed', () => {
+    useAppStore.setState({ savedProfiles: [fixtureA, fixtureB], activeProfile: fixtureB })
+    useAppStore.getState().renameSavedProfile(fixtureA.id, 'Renamed')
+    expect(useAppStore.getState().activeProfile?.name).toBe(fixtureB.name)
+  })
+
+  it('renameSavedProfile is a no-op when no profile matches the id', () => {
+    useAppStore.setState({ savedProfiles: [fixtureA, fixtureB] })
+    useAppStore.getState().renameSavedProfile('ghost-id', 'Whatever')
+    const { savedProfiles } = useAppStore.getState()
+    expect(savedProfiles[0].name).toBe(fixtureA.name)
+    expect(savedProfiles[1].name).toBe(fixtureB.name)
+  })
 })

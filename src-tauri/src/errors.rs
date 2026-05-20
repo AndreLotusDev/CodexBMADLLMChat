@@ -20,6 +20,8 @@ pub enum AppError {
     ProfileNotFound,
     #[error("A profile with this name already exists.")]
     DuplicateProfileName,
+    #[error("Profile name cannot be empty.")]
+    InvalidProfileName,
     #[error("Failed to store credentials securely: {0}")]
     CredentialStoreError(String),
     #[error("Failed to retrieve credentials: {0}")]

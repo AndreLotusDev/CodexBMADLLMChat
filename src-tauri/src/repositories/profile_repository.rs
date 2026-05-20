@@ -81,6 +81,20 @@ impl ProfileRepository {
         Ok(())
     }
 
+    pub fn rename(&self, profile_id: &str, new_name: &str) -> Result<(), AppError> {
+        let trimmed = new_name.trim();
+        if trimmed.is_empty() {
+            return Err(AppError::InvalidProfileName);
+        }
+        let guard = self.conn.lock().map_err(|e| AppError::Internal(format!("DB lock poisoned: {e}")))?;
+        let rows = guard.execute(
+            "UPDATE connection_profiles SET name = ?1 WHERE id = ?2",
+            params![trimmed, profile_id],
+        ).map_err(|e| AppError::Internal(e.to_string()))?;
+        if rows == 0 { return Err(AppError::ProfileNotFound); }
+        Ok(())
+    }
+
     pub fn find(&self, profile_id: &str) -> Result<ConnectionProfile, AppError> {
         let guard = self.conn.lock().map_err(|e| AppError::Internal(format!("DB lock poisoned: {e}")))?;
         guard.query_row(
@@ -222,6 +236,60 @@ mod tests {
         }
         let profiles = repo.list().unwrap();
         assert_eq!(profiles.len(), 12);
+    }
+
+    #[test]
+    fn rename_updates_existing_profile() {
+        let repo = new_in_memory_repo();
+        let p = repo.insert(&sample_params("Old")).unwrap();
+        repo.rename(&p.id, "New").unwrap();
+        let listed = repo.list().unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].name, "New");
+        assert_eq!(repo.find(&p.id).unwrap().name, "New");
+    }
+
+    #[test]
+    fn rename_trims_whitespace_in_new_name() {
+        let repo = new_in_memory_repo();
+        let p = repo.insert(&sample_params("Old")).unwrap();
+        repo.rename(&p.id, "  Padded  ").unwrap();
+        assert_eq!(repo.find(&p.id).unwrap().name, "Padded");
+    }
+
+    #[test]
+    fn rename_with_empty_name_returns_invalid_profile_name() {
+        let repo = new_in_memory_repo();
+        let p = repo.insert(&sample_params("Original")).unwrap();
+        let result = repo.rename(&p.id, "");
+        assert!(matches!(result, Err(AppError::InvalidProfileName)));
+        assert_eq!(repo.find(&p.id).unwrap().name, "Original");
+    }
+
+    #[test]
+    fn rename_with_whitespace_only_name_returns_invalid_profile_name() {
+        let repo = new_in_memory_repo();
+        let p = repo.insert(&sample_params("Original")).unwrap();
+        let result = repo.rename(&p.id, "   ");
+        assert!(matches!(result, Err(AppError::InvalidProfileName)));
+        assert_eq!(repo.find(&p.id).unwrap().name, "Original");
+    }
+
+    #[test]
+    fn rename_nonexistent_returns_profile_not_found() {
+        let repo = new_in_memory_repo();
+        let result = repo.rename("ghost-id", "Whatever");
+        assert!(matches!(result, Err(AppError::ProfileNotFound)));
+    }
+
+    #[test]
+    fn rename_does_not_affect_other_profiles() {
+        let repo = new_in_memory_repo();
+        let a = repo.insert(&sample_params("Alpha")).unwrap();
+        let b = repo.insert(&sample_params("Beta")).unwrap();
+        repo.rename(&a.id, "AlphaRenamed").unwrap();
+        assert_eq!(repo.find(&a.id).unwrap().name, "AlphaRenamed");
+        assert_eq!(repo.find(&b.id).unwrap().name, "Beta");
     }
 
     #[test]

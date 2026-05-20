@@ -33,6 +33,7 @@ interface AppState {
   setActiveProfile: (profile: ConnectionProfile | null) => void
   addSavedProfile: (profile: ConnectionProfile) => void
   removeSavedProfile: (profileId: string) => void
+  renameSavedProfile: (profileId: string, newName: string) => void
 }
 
 export const useAppStore = create<AppState>()((set) => ({
@@ -168,5 +169,14 @@ export const useAppStore = create<AppState>()((set) => ({
     set((state) => ({
       savedProfiles: state.savedProfiles.filter(p => p.id !== profileId),
       activeProfile: state.activeProfile?.id === profileId ? null : state.activeProfile,
+    })),
+  renameSavedProfile: (profileId, newName) =>
+    set((state) => ({
+      savedProfiles: state.savedProfiles.map(p =>
+        p.id === profileId ? { ...p, name: newName } : p
+      ),
+      activeProfile: state.activeProfile?.id === profileId
+        ? { ...state.activeProfile, name: newName }
+        : state.activeProfile,
     })),
 }))
