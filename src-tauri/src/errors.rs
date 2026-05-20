@@ -18,6 +18,12 @@ pub enum AppError {
     ExtractionFailed(String),
     #[error("Profile not found.")]
     ProfileNotFound,
+    #[error("A profile with this name already exists.")]
+    DuplicateProfileName,
+    #[error("Failed to store credentials securely: {0}")]
+    CredentialStoreError(String),
+    #[error("Failed to retrieve credentials: {0}")]
+    CredentialNotFound(String),
 }
 
 impl From<AppError> for String {

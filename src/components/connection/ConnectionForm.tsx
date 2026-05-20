@@ -1,4 +1,4 @@
-import { FC, useState } from 'react'
+import { FC, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
 import { Input } from '@/components/ui/input'
@@ -8,6 +8,8 @@ import { commands } from '@/commands'
 import { useAppStore } from '@/store/appStore'
 import type { TauriCommandError } from '@/types'
 import TestConnectionBanner from './TestConnectionBanner'
+import ProfileDropdown from './ProfileDropdown'
+import SaveProfileInline from './SaveProfileInline'
 
 const ConnectionForm: FC = () => {
   const navigate = useNavigate()
@@ -25,6 +27,8 @@ const ConnectionForm: FC = () => {
   const schemaProgress = useAppStore(s => s.schemaProgress)
   const setSchemaTree = useAppStore(s => s.setSchemaTree)
   const setSchemaProgress = useAppStore(s => s.setSchemaProgress)
+  const activeProfile = useAppStore(s => s.activeProfile)
+  const setSavedProfiles = useAppStore(s => s.setSavedProfiles)
 
   const portNum = parseInt(port, 10)
   const isPortValid = !isNaN(portNum) && portNum >= 1 && portNum <= 65535
@@ -35,6 +39,27 @@ const ConnectionForm: FC = () => {
     database.trim() !== '' &&
     username.trim() !== '' &&
     password.trim() !== ''
+
+  useEffect(() => {
+    commands.listProfiles()
+      .then(setSavedProfiles)
+      .catch(() => { /* silently ignore — empty list is graceful default */ })
+  }, [setSavedProfiles])
+
+  // Sync form fields when activeProfile changes — React 18+ "Adjusting state when a prop changes" pattern
+  // (https://react.dev/reference/react/useState#storing-information-from-previous-renders).
+  const [prevProfileId, setPrevProfileId] = useState<string | null>(null)
+  const currentProfileId = activeProfile?.id ?? null
+  if (currentProfileId !== prevProfileId) {
+    setPrevProfileId(currentProfileId)
+    if (activeProfile !== null) {
+      setHost(activeProfile.host)
+      setPort(String(activeProfile.port))
+      setDatabase(activeProfile.database)
+      setUsername(activeProfile.username)
+      setPassword('') // AC3: pre-fills all fields EXCEPT password
+    }
+  }
 
   const handleSubmit = async () => {
     setConnectionStatus('connecting')
@@ -53,8 +78,12 @@ const ConnectionForm: FC = () => {
     }
   }
 
+  const isPasswordDisabled = activeProfile !== null
+
   return (
     <div className="flex flex-col gap-4 max-w-md">
+      <ProfileDropdown />
+
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="host">Host</Label>
         <Input
@@ -104,41 +133,58 @@ const ConnectionForm: FC = () => {
             value={password}
             onChange={e => setPassword(e.target.value)}
             className="pr-9"
+            disabled={isPasswordDisabled}
+            placeholder={isPasswordDisabled ? 'Saved securely (read from Credential Manager)' : undefined}
           />
           <button
             type="button"
             aria-label={showPassword ? 'Hide password' : 'Show password'}
             onClick={() => setShowPassword(v => !v)}
-            className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground"
+            disabled={isPasswordDisabled}
+            className="absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground hover:text-foreground disabled:opacity-50"
           >
             {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
         </div>
       </div>
 
-      <Button
-        onClick={handleSubmit}
-        disabled={!isFormFilled || connectionStatus === 'connecting'}
-      >
-        {connectionStatus === 'connecting' ? 'Testing…' : 'Test Connection'}
-      </Button>
+      {activeProfile === null && (
+        <Button
+          onClick={handleSubmit}
+          disabled={!isFormFilled || connectionStatus === 'connecting'}
+        >
+          {connectionStatus === 'connecting' ? 'Testing…' : 'Test Connection'}
+        </Button>
+      )}
 
       <TestConnectionBanner status={connectionStatus} errorMessage={connectionError} />
 
-      {connectionStatus === 'connected' && (
+      {connectionStatus === 'connected' && activeProfile === null && (
+        <SaveProfileInline
+          host={host.trim()}
+          port={portNum}
+          database={database.trim()}
+          username={username.trim()}
+          password={password}
+        />
+      )}
+
+      {(activeProfile !== null || connectionStatus === 'connected') && (
         <div className="flex flex-col gap-2">
           <Button
             onClick={async () => {
               setIsConnecting(true)
               setSchemaProgress(null)
               try {
-                const tree = await commands.connectAndExtractSchema({
-                  host: host.trim(),
-                  port: portNum,
-                  database: database.trim(),
-                  username: username.trim(),
-                  password,
-                })
+                const tree = activeProfile !== null
+                  ? await commands.connectWithSavedProfile(activeProfile.id)
+                  : await commands.connectAndExtractSchema({
+                      host: host.trim(),
+                      port: portNum,
+                      database: database.trim(),
+                      username: username.trim(),
+                      password,
+                    })
                 setSchemaTree(tree)
                 navigate('/schema')
               } catch (err) {

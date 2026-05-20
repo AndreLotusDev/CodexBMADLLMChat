@@ -1,5 +1,5 @@
 import { useAppStore } from '../store/appStore'
-import type { Annotation, PgColumn, PgTable, PromptBlock } from '../types'
+import type { Annotation, ConnectionProfile, PgColumn, PgTable, PromptBlock } from '../types'
 
 beforeEach(() => {
   useAppStore.setState({
@@ -13,6 +13,8 @@ beforeEach(() => {
     annotations: new Map<string, Annotation>(),
     prompt: null,
     isGenerating: false,
+    savedProfiles: [],
+    activeProfile: null,
   })
 })
 
@@ -273,5 +275,73 @@ describe('prompt actions', () => {
     useAppStore.getState().clearConnection()
     expect(useAppStore.getState().prompt).toBeNull()
     expect(useAppStore.getState().isGenerating).toBe(false)
+  })
+})
+
+describe('profiles slice', () => {
+  const fixtureA: ConnectionProfile = {
+    id: 'profile-a-id',
+    name: 'Prod DB',
+    host: 'prod.example.com',
+    port: 5432,
+    database: 'app',
+    username: 'postgres',
+    createdAt: '2026-05-20T00:00:00Z',
+  }
+  const fixtureB: ConnectionProfile = {
+    id: 'profile-b-id',
+    name: 'Staging',
+    host: 'stage.example.com',
+    port: 5432,
+    database: 'app',
+    username: 'postgres',
+    createdAt: '2026-05-20T01:00:00Z',
+  }
+
+  it('setSavedProfiles writes the list to the store', () => {
+    useAppStore.getState().setSavedProfiles([fixtureA, fixtureB])
+    expect(useAppStore.getState().savedProfiles).toEqual([fixtureA, fixtureB])
+  })
+
+  it('setActiveProfile(profile) sets the active profile', () => {
+    useAppStore.getState().setActiveProfile(fixtureA)
+    expect(useAppStore.getState().activeProfile).toEqual(fixtureA)
+  })
+
+  it('setActiveProfile(null) clears the active profile', () => {
+    useAppStore.setState({ activeProfile: fixtureA })
+    useAppStore.getState().setActiveProfile(null)
+    expect(useAppStore.getState().activeProfile).toBeNull()
+  })
+
+  it('addSavedProfile appends to the existing list (does NOT replace)', () => {
+    useAppStore.setState({ savedProfiles: [fixtureA] })
+    useAppStore.getState().addSavedProfile(fixtureB)
+    expect(useAppStore.getState().savedProfiles).toEqual([fixtureA, fixtureB])
+  })
+
+  it('removeSavedProfile filters by id', () => {
+    useAppStore.setState({ savedProfiles: [fixtureA, fixtureB] })
+    useAppStore.getState().removeSavedProfile(fixtureA.id)
+    expect(useAppStore.getState().savedProfiles).toEqual([fixtureB])
+  })
+
+  it('removeSavedProfile clears activeProfile when the removed id matches', () => {
+    useAppStore.setState({ savedProfiles: [fixtureA, fixtureB], activeProfile: fixtureA })
+    useAppStore.getState().removeSavedProfile(fixtureA.id)
+    expect(useAppStore.getState().activeProfile).toBeNull()
+  })
+
+  it('removeSavedProfile leaves activeProfile unchanged when ids do NOT match', () => {
+    useAppStore.setState({ savedProfiles: [fixtureA, fixtureB], activeProfile: fixtureA })
+    useAppStore.getState().removeSavedProfile(fixtureB.id)
+    expect(useAppStore.getState().activeProfile).toEqual(fixtureA)
+  })
+
+  it('clearConnection resets activeProfile to null but LEAVES savedProfiles intact', () => {
+    useAppStore.setState({ savedProfiles: [fixtureA, fixtureB], activeProfile: fixtureA })
+    useAppStore.getState().clearConnection()
+    expect(useAppStore.getState().activeProfile).toBeNull()
+    expect(useAppStore.getState().savedProfiles).toEqual([fixtureA, fixtureB])
   })
 })

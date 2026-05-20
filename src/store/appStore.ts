@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Annotation, PgColumn, PgTable, PromptBlock, SchemaTree } from '../types'
+import type { Annotation, ConnectionProfile, PgColumn, PgTable, PromptBlock, SchemaTree } from '../types'
 
 interface AppState {
   connectionStatus: 'idle' | 'connecting' | 'connected' | 'error'
@@ -12,6 +12,8 @@ interface AppState {
   annotations: Map<string, Annotation>
   prompt: PromptBlock | null
   isGenerating: boolean
+  savedProfiles: ConnectionProfile[]
+  activeProfile: ConnectionProfile | null
   setConnectionStatus: (status: AppState['connectionStatus'], error?: string) => void
   clearConnection: () => void
   setSchemaTree: (tree: SchemaTree | null) => void
@@ -25,6 +27,10 @@ interface AppState {
   removeAnnotation: (key: string) => void
   setPrompt: (prompt: PromptBlock | null) => void
   setIsGenerating: (v: boolean) => void
+  setSavedProfiles: (profiles: ConnectionProfile[]) => void
+  setActiveProfile: (profile: ConnectionProfile | null) => void
+  addSavedProfile: (profile: ConnectionProfile) => void
+  removeSavedProfile: (profileId: string) => void
 }
 
 export const useAppStore = create<AppState>()((set) => ({
@@ -38,6 +44,8 @@ export const useAppStore = create<AppState>()((set) => ({
   annotations: new Map<string, Annotation>(),
   prompt: null,
   isGenerating: false,
+  savedProfiles: [],
+  activeProfile: null,
   setConnectionStatus: (status, error) =>
     set({ connectionStatus: status, connectionError: error ?? null }),
   clearConnection: () =>
@@ -52,6 +60,7 @@ export const useAppStore = create<AppState>()((set) => ({
       annotations: new Map<string, Annotation>(),
       prompt: null,
       isGenerating: false,
+      activeProfile: null,
     }),
   setSchemaTree: (tree) => set({ schemaTree: tree }),
   setSchemaProgress: (progress) => set({ schemaProgress: progress }),
@@ -141,4 +150,13 @@ export const useAppStore = create<AppState>()((set) => ({
     }),
   setPrompt: (prompt) => set({ prompt }),
   setIsGenerating: (v) => set({ isGenerating: v }),
+  setSavedProfiles: (profiles) => set({ savedProfiles: profiles }),
+  setActiveProfile: (profile) => set({ activeProfile: profile }),
+  addSavedProfile: (profile) =>
+    set((state) => ({ savedProfiles: [...state.savedProfiles, profile] })),
+  removeSavedProfile: (profileId) =>
+    set((state) => ({
+      savedProfiles: state.savedProfiles.filter(p => p.id !== profileId),
+      activeProfile: state.activeProfile?.id === profileId ? null : state.activeProfile,
+    })),
 }))

@@ -1,0 +1,160 @@
+schema: 1
+story: '4.1'
+story_title: 'Save & Load Connection Profiles'
+gate: CONCERNS
+status_reason: 'All 6 ACs implemented; architecture §15.2 password lifecycle rigorously honored (WinCred only, no SQLite columns, no Zustand fields, explicit drop). Frontend gates all green (tsc/vitest/eslint/build); 182/182 tests pass including 30 new for this story. Repository unit tests are thorough. Concerns: (a) save_profile compensation path (WinCred failure → SQLite rollback) is not exercised by any test — this is the one place credentials cross the trust boundary and the rollback is structurally untested; (b) backend cargo gates could not be run in the review environment due to the documented pre-existing MSVC SDK gap, so Rust code is review-by-eye only; (c) constraint-violation routing collapses port_range and name_not_empty errors into DuplicateProfileName, surfacing misleading error text for unusual paths. None block "Ready for Done", but the compensation test gap and backend-gate verification should be addressed before merge.'
+reviewer: 'Quinn (Test Architect)'
+updated: '2026-05-20T10:45:00Z'
+
+quality_score: 90
+expires: '2026-06-03T10:45:00Z'
+
+evidence:
+  tests_reviewed: 41
+  risks_identified: 7
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6]
+    ac_gaps: []
+  given_when_then:
+    - ac: 1
+      gwt: |
+        Given the user has just successfully tested a connection with manual-entry credentials (no active saved profile)
+        When connectionStatus === 'connected' AND activeProfile === null
+        Then SaveProfileInline renders below the success banner with a name input, Save button, and Dismiss button; entering a name and clicking Save invokes commands.saveProfile(...) and on resolution adds the new profile to savedProfiles, sets it as activeProfile, and hides the panel.
+      tests:
+        - 'src/__tests__/SaveProfileInline.test.tsx — initial render shows the prompt, name input, disabled Save, and Dismiss'
+        - 'src/__tests__/SaveProfileInline.test.tsx — Save calls commands.saveProfile and hides the panel on success'
+        - 'src/__tests__/SaveProfileInline.test.tsx — successful save adds the returned profile to the store and sets it active'
+        - 'src/__tests__/ConnectionForm.test.tsx — SaveProfileInline appears after test success when no profile is active'
+        - 'src/__tests__/ConnectionForm.test.tsx — SaveProfileInline does NOT appear when a saved profile is active even after status=connected'
+    - ac: 2
+      gwt: |
+        Given the store contains one or more ConnectionProfiles in savedProfiles
+        When ProfileDropdown renders
+        Then a native <select> appears with "— Manual entry —" first and one <option> per profile; selecting a profile id calls setActiveProfile(profile); selecting "" calls setActiveProfile(null). When savedProfiles is empty, the component returns null.
+      tests:
+        - 'src/__tests__/ProfileDropdown.test.tsx — returns null and renders nothing when there are no saved profiles'
+        - 'src/__tests__/ProfileDropdown.test.tsx — renders the select with manual-entry option plus one option per profile when profiles exist'
+        - 'src/__tests__/ProfileDropdown.test.tsx — manual-entry option is selected by default (no active profile)'
+        - 'src/__tests__/ProfileDropdown.test.tsx — selecting a profile sets activeProfile in the store'
+        - 'src/__tests__/ProfileDropdown.test.tsx — selecting manual-entry clears activeProfile'
+        - 'src-tauri/src/repositories/profile_repository.rs — list_returns_inserted_profiles_sorted_by_name_case_insensitive'
+    - ac: 3
+      gwt: |
+        Given a saved profile is selected (activeProfile !== null)
+        When the form re-renders via the "Adjusting state when a prop changes" pattern
+        Then Host/Port/Database/Username inputs are populated from the profile, Password is cleared ('') and disabled with placeholder "Saved securely (read from Credential Manager)", and the show-password toggle is disabled.
+      tests:
+        - 'src/__tests__/ConnectionForm.test.tsx — saved profile selection pre-fills Host/Port/Database/Username; password stays empty and disabled'
+        - 'src/__tests__/ConnectionForm.test.tsx — Connect button uses connect_with_saved_profile when a saved profile is active'
+        - 'src/__tests__/ConnectionForm.test.tsx — Test Connection button is hidden when a saved profile is active'
+    - ac: 4
+      gwt: |
+        Given a profile has been saved via save_profile
+        When connect_with_saved_profile(profile_id) is dispatched
+        Then the Rust handler retrieves the password from keyring (Windows Credential Manager) via CredentialStore::retrieve, moves it into TestConnectionParams, builds a pool via ConnectionManager::connect, and drops params explicitly. The plaintext password never appears in SQLite, in the Zustand store, in IPC responses, or in error log strings.
+      tests:
+        - 'src-tauri/src/credential_store.rs — roundtrip_store_retrieve_delete (ignored — Windows-only manual verification)'
+        - 'src-tauri/src/credential_store.rs — delete_nonexistent_is_idempotent (ignored — Windows-only manual verification)'
+        - 'src/__tests__/ConnectionForm.test.tsx — Connect button uses connect_with_saved_profile when a saved profile is active'
+        - 'Code review of src-tauri/src/commands/profiles.rs:23-31 — password lifecycle (memory → params → store → drop)'
+        - 'Code review of src-tauri/src/commands/connection.rs:25-36 — password lifecycle (retrieve → params → pool → drop)'
+    - ac: 5
+      gwt: |
+        Given the user has selected a saved profile and clicks Delete
+        When window.confirm() returns true
+        Then commands.deleteProfile(profile_id) invokes the Rust handler which deletes the SQLite row first (cascade-delete annotations) then calls credential_store.delete (idempotent on NoEntry); the local store updates via removeSavedProfile which also clears activeProfile if the deleted id matched.
+      tests:
+        - 'src/__tests__/ProfileDropdown.test.tsx — Delete calls deleteProfile and removes the profile from the store'
+        - 'src/__tests__/ProfileDropdown.test.tsx — Delete is canceled when window.confirm returns false (invoke NOT called)'
+        - 'src/__tests__/ProfileDropdown.test.tsx — Delete error path: alerts the user with the error message'
+        - 'src/__tests__/ProfileDropdown.test.tsx — Delete button is disabled when no profile is active'
+        - 'src/__tests__/appStore.test.ts — removeSavedProfile clears activeProfile when the removed id matches'
+        - 'src/__tests__/appStore.test.ts — removeSavedProfile leaves activeProfile unchanged when ids do NOT match'
+        - 'src-tauri/src/repositories/profile_repository.rs — delete_removes_profile'
+        - 'src-tauri/src/repositories/profile_repository.rs — delete_nonexistent_returns_profile_not_found'
+    - ac: 6
+      gwt: |
+        Given the profile_repository implementation
+        When 12 profiles are inserted sequentially into an in-memory SQLite DB
+        Then list() returns all 12 ordered by name COLLATE NOCASE ASC; the schema has no row-count limit, and the native <select> scrolls automatically beyond 10 options.
+      tests:
+        - 'src-tauri/src/repositories/profile_repository.rs — supports_at_least_10_profiles (inserts 12, lists 12)'
+        - 'src-tauri/src/repositories/profile_repository.rs — list_returns_inserted_profiles_sorted_by_name_case_insensitive'
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Password lifecycle (architecture §15.2) fully honored. Verified by code review: (1) password only in React useState in ConnectionForm — never in Zustand store; (2) ConnectionProfile struct (Rust + TS + store) carries no password field; (3) SaveProfileParams.password is consumed in save_profile, written to WinCred, never inserted into connection_profiles SQLite table (which has no password column); (4) explicit drop(params) in save_profile and connect_with_saved_profile; (5) AppError variants never include password content in their format strings (`Internal(String)` is used but the message strings constructed in this story do not interpolate password content); (6) WinCred is the OS-vault-encrypted-at-rest store per NFR3. No new IPC introduces credential leaks; tracing is not yet in Cargo.toml so no log path could leak credentials. One residual concern (TEST-4.1-001) is that the compensation rollback (WinCred-fail → SQLite-delete) is structurally untested, but the static code path is correct.'
+  performance:
+    status: PASS
+    notes: 'Sync std::sync::Mutex<rusqlite::Connection> used directly in async command handlers — sub-ms lock for the single-row operations in this story; not blocking the tokio worker meaningfully for MVP load (<50 profiles, single user). Documented Dev Notes "Sync Mutex Trade-off" with explicit forward-migration path to spawn_blocking when query complexity grows. WAL mode enabled on open (PRAGMA journal_mode = WAL) for read concurrency. list() uses ORDER BY name COLLATE NOCASE — fine for <50 rows without an index. SQLite path resolved via Tauri v2 app.path().app_data_dir() inside .setup() — correct hook for runtime-resolved state. Frontend bundle 244.80 kB / 78.17 kB gzipped (+4.62 kB vs Story 3.3 baseline) for the dropdown + save panel + form integration — proportional to the work added.'
+  reliability:
+    status: CONCERNS
+    notes: 'Excellent: idempotent migrations (CREATE TABLE IF NOT EXISTS + INSERT OR IGNORE); idempotent WinCred delete (swallows NoEntry); FOREIGN KEY constraint with ON DELETE CASCADE ensures annotation rows are removed atomically when a profile is deleted. The save_profile handler implements the architected SQLite-first-then-WinCred ordering with compensation rollback if WinCred fails (avoiding orphan profiles with no credentials). The delete handler implements the inverse ordering (SQLite-first, then idempotent WinCred). Concerns: (1) the compensation rollback IS NOT exercised by any test — to test it we would need to inject a WinCred failure, which is not possible without abstracting CredentialStore behind a trait (TEST-4.1-001); (2) on the rollback path, the SQLite delete is best-effort (`let _ = repo.delete(...)`) — if SQLite mutex is poisoned at the moment, we leak an orphan profile row with no surface error (REL-4.1-001); (3) delete-profile race condition between sessions leaves stale local state on ProfileNotFound (REL-4.1-002). The first concern is the most material — even though the code path is short and clearly correct by inspection, a regression that breaks the compensation could leak orphans without test detection.'
+  maintainability:
+    status: PASS
+    notes: 'Type mirroring (architecture §17.1) respected: ConnectionProfile and SaveProfileParams have matching Rust ⇄ TS shapes with serde rename_all=camelCase. IPC gateway preserved: all invoke() calls funnel through src/commands/index.ts (verified by grep — no direct @tauri-apps/api imports in components). Command handlers stay thin: list_profiles=1 line, save_profile=10 lines, delete_profile=4 lines, connect_with_saved_profile=12 lines — all comfortably ≤15 per architecture §17.1. Field-selector discipline preserved: every new useAppStore(...) call passes a selector. Repository tests use in-memory SQLite — fast, hermetic, no file I/O. Migration is self-contained in 001_initial.sql and includes the annotations table for Story 4.2 (avoids a needless 002 migration). Sibling IPC `connect_with_saved_profile` instead of refactoring `connect_and_extract_schema` — well-justified backward-compatibility decision with explicit forward migration path documented in Dev Notes "Architectural Deviation".'
+
+top_issues:
+  - id: 'TEST-4.1-001'
+    severity: medium
+    finding: 'The save_profile compensation rollback (WinCred-write fails → SQLite row deleted) is structurally untested. The branch in src-tauri/src/commands/profiles.rs:25-29 cannot be unit-tested without introducing a trait abstraction over CredentialStore for failure injection. This is the one place in the new code where the credential trust boundary is crossed and the rollback runs — a silent regression here would either leak credential entries to WinCred without a SQLite row (less likely given the ordering) or, more likely, leak SQLite rows without WinCred entries (orphan profiles whose connect_with_saved_profile call would always fail with CredentialNotFound). The static code path is correct by inspection.'
+    suggested_action: 'Option A (recommended): refactor CredentialStore behind a trait `CredentialStoreApi` and inject a mock that returns Err in the compensation test. Adds ~30 lines and one mock impl in tests. Option B (lighter): add an integration-style test that uses a deliberately-conflicting WinCred service_name on the test machine to force a real failure — Windows-only, can be `#[ignore]`d. Option C (minimum): add a code comment with a manual verification recipe (kill WinCred service mid-save, verify SQLite row is rolled back) and accept the test gap as documented MVP scope.'
+    suggested_owner: dev
+    refs: ['src-tauri/src/commands/profiles.rs:23-32', 'src-tauri/src/credential_store.rs:17-22']
+  - id: 'TEST-4.1-002'
+    severity: low
+    finding: 'connect_with_saved_profile is the new architected sibling IPC for connect-by-profile and is tested only end-to-end via the frontend ConnectionForm test ("Connect button uses connect_with_saved_profile when a saved profile is active"). There is no Rust unit/integration test that exercises the handler directly — the (find profile → retrieve password → build params → drop) sequence is covered by code-review only. The find / retrieve calls each have repository or credential_store tests, but the composition is unverified.'
+    suggested_action: 'Optional: add a `#[cfg(test)] mod tests` block to commands/connection.rs that mocks AppState (would require the trait refactor from TEST-4.1-001) and asserts the call sequence. Lower priority than TEST-4.1-001 — the composition is short and each underlying call IS unit-tested.'
+    suggested_owner: dev
+    refs: ['src-tauri/src/commands/connection.rs:19-37']
+  - id: 'TEST-4.1-003'
+    severity: low
+    finding: 'Backend cargo gates (cargo check, cargo test) could not be executed in the review environment due to the documented pre-existing MSVC SDK toolchain gap (Visual Studio 18 Insiders does not auto-resolve windows.h / msvcrt.lib for cc-rs). The Dev Agent Record acknowledges this for the dev environment as well. The Rust code is reviewed-by-eye only in this session; compile-verification depends on CI or a developer machine with a working MSVC toolchain.'
+    suggested_action: 'Before merge, run `cargo check` and `cargo test` on a machine with a working MSVC toolchain (or in CI) to verify (a) the new keyring/rusqlite/uuid/chrono dependencies resolve, (b) the Rust test suite passes, (c) `cargo test -- --ignored` passes the two WinCred roundtrip tests on a Windows host. Document the verification result in the story Dev Agent Record before transitioning the story to Done.'
+    suggested_owner: dev
+    refs: ['src-tauri/Cargo.toml', 'src-tauri/src/credential_store.rs:47-65', 'docs/stories/4.1.story.md#dev-agent-record-debug-log-references']
+  - id: 'SEC-4.1-001'
+    severity: low
+    finding: 'The repository.insert error mapping collapses ALL ConstraintViolation errors (CHECK name_not_empty, CHECK port_range, and any future UNIQUE) into AppError::DuplicateProfileName. The user-facing message "A profile with this name already exists." is misleading when the actual cause is an empty name or an out-of-range port (1-65535). Risk is low because client-side form validation prevents both cases in normal use, but a bug or future field-addition could surface the wrong message.'
+    suggested_action: 'Inspect the SqliteFailure extended code or the constraint name string in the error to differentiate violations. rusqlite returns the constraint name via `extended_code` or the error message — match on that to return ProfileNotFound vs DuplicateProfileName vs a new `InvalidProfile(field)` variant. ~15 lines, additive change.'
+    suggested_owner: dev
+    refs: ['src-tauri/src/repositories/profile_repository.rs:65-71', 'src-tauri/src/migrations/001_initial.sql:15-16']
+  - id: 'REL-4.1-001'
+    severity: low
+    finding: 'In save_profile, the compensation rollback uses `let _ = state.profile_repo.delete(&profile.id);` — if the SQLite delete fails (e.g., poisoned mutex from a panic in another command), we silently leak an orphan profile row in SQLite while still propagating the original WinCred error. The orphan would then fail every connect_with_saved_profile attempt with CredentialNotFound — visible to the user, but only on next attempt and without explanatory context.'
+    suggested_action: 'Either (a) wrap the compensation delete in a tracing::warn! when it fails so the leak is observable in logs (once tracing is added in a later story), or (b) include the rollback failure in the returned error message so the user sees "Failed to save credentials AND failed to clean up — please delete profile manually." For MVP, option (a) is sufficient; option (b) requires the tracing crate.'
+    suggested_owner: dev
+    refs: ['src-tauri/src/commands/profiles.rs:26-29']
+  - id: 'REL-4.1-002'
+    severity: low
+    finding: 'In ProfileDropdown.handleDelete, when commands.deleteProfile rejects with ProfileNotFound (e.g., the profile was deleted in another session/window since the dropdown was last refreshed), the alert is shown but removeSavedProfile is NOT called — leaving the stale profile entry in the local store. The next refresh (listProfiles on next mount) would correct this, but a user could see a stale entry until they navigate away.'
+    suggested_action: 'In the catch block, if the rejected error code is `ProfileNotFound`, also call removeSavedProfile(activeProfile.id) before alerting (or instead of alerting, with a milder "Profile was already removed elsewhere" message). ~3 lines.'
+    suggested_owner: dev
+    refs: ['src/components/connection/ProfileDropdown.tsx:26-36']
+  - id: 'MNT-4.1-001'
+    severity: low
+    finding: 'In SaveProfileInline.tsx:30-33, the inner empty-name guard `if (name.trim() === '') { setError("Profile name is required"); return }` is effectively dead code in normal user flow because the Save button is `disabled={isSaving || name.trim() === ""}` (line 71). The test at SaveProfileInline.test.tsx:95-104 asserts the disabled state rather than exercising the inner guard. Either the guard is genuine defense-in-depth (in which case the test should bypass the disabled state to exercise it) or it is redundant (remove it). The current state has both belt and suspenders but neither is tested.'
+    suggested_action: 'Recommended: remove the inner guard since the disabled-button is the authoritative source of truth. The test stays as-is (asserts the disabled state). Saves 4 lines. Alternative: keep the guard and use `userEvent` or direct call to surface the inner error message — but that adds test surface for behavior that should not be reachable.'
+    suggested_owner: dev
+    refs: ['src/components/connection/SaveProfileInline.tsx:29-33,71', 'src/__tests__/SaveProfileInline.test.tsx:95-104']
+
+recommendations:
+  immediate:
+    - action: 'Run cargo check and cargo test on a properly-toolchained Windows machine (or CI) before merging — confirms the new dependency stack compiles and the 11 repository unit tests pass.'
+      refs: ['src-tauri/Cargo.toml', 'src-tauri/src/repositories/profile_repository.rs:106-243']
+    - action: 'Add an integration-style test for the save_profile compensation rollback (TEST-4.1-001) OR document the manual verification recipe and accept the test gap explicitly in this story''s Dev Agent Record.'
+      refs: ['src-tauri/src/commands/profiles.rs:23-32']
+  future:
+    - action: 'Refactor constraint-violation routing in profile_repository.insert to differentiate name_not_empty (return InvalidProfile or a clearer error) from a future UNIQUE(name) violation (return DuplicateProfileName) — see SEC-4.1-001.'
+      refs: ['src-tauri/src/repositories/profile_repository.rs:65-71']
+    - action: 'When the `tracing` crate is added in a later story, surface the save_profile compensation rollback failure (REL-4.1-001) and the delete-profile race (REL-4.1-002) as observable warnings rather than silently swallowing them.'
+      refs: ['src-tauri/src/commands/profiles.rs:26-29', 'src/components/connection/ProfileDropdown.tsx:26-36']
+    - action: 'Post-MVP, migrate the repository methods to tokio::task::spawn_blocking per architecture §17.3 when query complexity grows beyond the single-row operations in this story (Sync Mutex Trade-off).'
+      refs: ['src-tauri/src/repositories/profile_repository.rs', 'docs/architecture/17-coding-standards.md#173-key-rust-patterns']
+    - action: 'When Story 4.3 lands the styled DeleteProfileDialog, also replace window.confirm() in ProfileDropdown with the styled dialog and improve the ProfileNotFound race handling (REL-4.1-002).'
+      refs: ['src/components/connection/ProfileDropdown.tsx:26-36', 'docs/architecture/10-frontend-architecture.md#101']
+
+waiver:
+  active: false

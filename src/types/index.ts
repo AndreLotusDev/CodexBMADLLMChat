@@ -78,3 +78,12 @@ export interface PromptBlock {
   columnCount: number
   generatedAt: string
 }
+
+export interface SaveProfileParams {
+  name: string
+  host: string
+  port: number
+  database: string
+  username: string
+  password: string
+}
