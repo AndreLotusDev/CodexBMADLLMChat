@@ -5,6 +5,7 @@ import { commands } from '@/commands'
 import { useAppStore } from '@/store/appStore'
 import SchemaTree from '@/components/schema/SchemaTree'
 import SchemaSearchBar from '@/components/schema/SchemaSearchBar'
+import SelectionSummary from '@/components/schema/SelectionSummary'
 
 const SchemaBrowserScreen: FC = () => {
   const navigate = useNavigate()
@@ -27,6 +28,7 @@ const SchemaBrowserScreen: FC = () => {
       </header>
 
       {schemaTree !== null && <SchemaSearchBar />}
+      {schemaTree !== null && <SelectionSummary />}
 
       <div className="flex-1 overflow-auto">
         {schemaTree === null ? (

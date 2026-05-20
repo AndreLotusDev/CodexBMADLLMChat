@@ -1,0 +1,16 @@
+schema: 1
+story: '3.1'
+gate: PASS
+status_reason: 'All 5 ACs implemented with field-selector discipline and 92/92 tests passing; one documented MVP UX limitation around clicking an indeterminate table checkbox is tracked for post-MVP follow-up.'
+reviewer: 'Quinn'
+updated: '2026-05-19T20:30:00Z'
+top_issues:
+  - id: 'MNT-001'
+    severity: low
+    finding: 'Clicking a table checkbox in the indeterminate state runs the "uncheck table" branch of toggleTable (because the table key is present), losing the partial selection. Industry convention is "indeterminate click → check all". Story explicitly accepts this as an MVP limitation in Dev Notes ("Checkbox Tri-State Behavior").'
+    suggested_action: 'Capture as a post-MVP UX backlog item: change toggleTable to "check all when indeterminate" by branching on (selectedTables.has(key) && allColumnsSelected) instead of presence alone.'
+  - id: 'TEST-001'
+    severity: low
+    finding: 'SchemaTree.test.tsx uses getAllByRole(``button``, { name: /select all/i }) which also matches "Deselect all" (substring match). Tests pass today due to DOM order, but the selector is fragile to layout reordering.'
+    suggested_action: 'Tighten the regex to /^select all$/i (or use exact-name option) so the matcher is unambiguous against "Deselect all". Optional polish.'
+waiver: { active: false }

@@ -1,5 +1,7 @@
+import { beforeEach, expect, it } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import TableNode from '../components/schema/TableNode'
+import { useAppStore } from '../store/appStore'
 import type { PgTable } from '../types'
 
 const mockTable: PgTable = {
@@ -12,6 +14,13 @@ const mockTable: PgTable = {
   primaryKeys: ['id'],
   foreignKeys: [],
 }
+
+beforeEach(() => {
+  useAppStore.setState({
+    selectedTables: new Set<string>(),
+    selectedColumns: new Set<string>(),
+  })
+})
 
 it('table header shows table name and column count', () => {
   render(<TableNode table={mockTable} />)
@@ -42,4 +51,9 @@ it('clicking header again collapses columns', () => {
 it('columns are visible when defaultExpanded is true', () => {
   render(<TableNode table={mockTable} defaultExpanded />)
   expect(screen.getByText('id')).toBeInTheDocument()
+})
+
+it('renders a checkbox for selecting the table', () => {
+  render(<TableNode table={mockTable} />)
+  expect(screen.getByRole('checkbox', { name: /select table users/i })).toBeInTheDocument()
 })
