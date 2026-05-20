@@ -1,5 +1,5 @@
 import { useAppStore } from '../store/appStore'
-import type { Annotation, PgColumn, PgTable } from '../types'
+import type { Annotation, PgColumn, PgTable, PromptBlock } from '../types'
 
 beforeEach(() => {
   useAppStore.setState({
@@ -11,6 +11,8 @@ beforeEach(() => {
     selectedTables: new Set<string>(),
     selectedColumns: new Set<string>(),
     annotations: new Map<string, Annotation>(),
+    prompt: null,
+    isGenerating: false,
   })
 })
 
@@ -237,5 +239,39 @@ describe('annotation actions', () => {
     })
     useAppStore.getState().clearConnection()
     expect(useAppStore.getState().annotations.size).toBe(0)
+  })
+})
+
+describe('prompt actions', () => {
+  const sample: PromptBlock = {
+    content: 'Here is my database schema:\n\nCREATE TABLE x ();\n',
+    tableCount: 1,
+    columnCount: 0,
+    generatedAt: '2026-05-20T00:00:00.000Z',
+  }
+
+  it('setPrompt(block) stores the prompt', () => {
+    useAppStore.getState().setPrompt(sample)
+    expect(useAppStore.getState().prompt).toEqual(sample)
+  })
+
+  it('setPrompt(null) clears the prompt', () => {
+    useAppStore.getState().setPrompt(sample)
+    useAppStore.getState().setPrompt(null)
+    expect(useAppStore.getState().prompt).toBeNull()
+  })
+
+  it('setIsGenerating toggles the flag', () => {
+    useAppStore.getState().setIsGenerating(true)
+    expect(useAppStore.getState().isGenerating).toBe(true)
+    useAppStore.getState().setIsGenerating(false)
+    expect(useAppStore.getState().isGenerating).toBe(false)
+  })
+
+  it('clearConnection resets prompt to null and isGenerating to false', () => {
+    useAppStore.setState({ prompt: sample, isGenerating: true })
+    useAppStore.getState().clearConnection()
+    expect(useAppStore.getState().prompt).toBeNull()
+    expect(useAppStore.getState().isGenerating).toBe(false)
   })
 })

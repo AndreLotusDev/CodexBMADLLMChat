@@ -71,3 +71,10 @@ export interface Annotation {
 }
 
 export type AnnotationKey = `${string}.${string}.${string | ''}`
+
+export interface PromptBlock {
+  content: string
+  tableCount: number
+  columnCount: number
+  generatedAt: string
+}

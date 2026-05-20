@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Annotation, PgColumn, PgTable, SchemaTree } from '../types'
+import type { Annotation, PgColumn, PgTable, PromptBlock, SchemaTree } from '../types'
 
 interface AppState {
   connectionStatus: 'idle' | 'connecting' | 'connected' | 'error'
@@ -10,6 +10,8 @@ interface AppState {
   selectedTables: Set<string>
   selectedColumns: Set<string>
   annotations: Map<string, Annotation>
+  prompt: PromptBlock | null
+  isGenerating: boolean
   setConnectionStatus: (status: AppState['connectionStatus'], error?: string) => void
   clearConnection: () => void
   setSchemaTree: (tree: SchemaTree | null) => void
@@ -21,6 +23,8 @@ interface AppState {
   deselectAllInSchema: (schemaName: string) => void
   setAnnotation: (key: string, annotation: Annotation) => void
   removeAnnotation: (key: string) => void
+  setPrompt: (prompt: PromptBlock | null) => void
+  setIsGenerating: (v: boolean) => void
 }
 
 export const useAppStore = create<AppState>()((set) => ({
@@ -32,6 +36,8 @@ export const useAppStore = create<AppState>()((set) => ({
   selectedTables: new Set<string>(),
   selectedColumns: new Set<string>(),
   annotations: new Map<string, Annotation>(),
+  prompt: null,
+  isGenerating: false,
   setConnectionStatus: (status, error) =>
     set({ connectionStatus: status, connectionError: error ?? null }),
   clearConnection: () =>
@@ -44,6 +50,8 @@ export const useAppStore = create<AppState>()((set) => ({
       selectedTables: new Set<string>(),
       selectedColumns: new Set<string>(),
       annotations: new Map<string, Annotation>(),
+      prompt: null,
+      isGenerating: false,
     }),
   setSchemaTree: (tree) => set({ schemaTree: tree }),
   setSchemaProgress: (progress) => set({ schemaProgress: progress }),
@@ -131,4 +139,6 @@ export const useAppStore = create<AppState>()((set) => ({
       next.delete(key)
       return { annotations: next }
     }),
+  setPrompt: (prompt) => set({ prompt }),
+  setIsGenerating: (v) => set({ isGenerating: v }),
 }))

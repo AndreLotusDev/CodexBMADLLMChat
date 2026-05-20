@@ -1,0 +1,129 @@
+schema: 1
+story: '3.3'
+story_title: 'Prompt Generation & Copy to Clipboard'
+gate: PASS
+status_reason: 'All 6 ACs implemented and traced to tests; PromptBlock shape matches architecture §4.5 verbatim; worked-example DDL is locked by a byte-equal verbatim test; 152/152 tests pass and all four gates (tsc, test, lint, build) are clean. Two architectural deferrals (Rust prompt-gen, Tauri clipboard plugin) are explicitly justified with forward-migration paths gated on Epic 4.x.'
+reviewer: 'Quinn (Test Architect)'
+updated: '2026-05-20T09:20:00Z'
+
+quality_score: 100
+expires: '2026-06-03T09:20:00Z'
+
+evidence:
+  tests_reviewed: 36
+  risks_identified: 4
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6]
+    ac_gaps: []
+  given_when_then:
+    - ac: 1
+      gwt: |
+        Given an active connection with selected tables in the store
+        When the user clicks the "Generate Prompt" button
+        Then `setPrompt(block)` writes a `PromptBlock` to the store and navigation routes to `/prompt`.
+      tests:
+        - 'src/__tests__/SchemaBrowserScreen.test.tsx — renders the "Generate Prompt" button and disables it when no selection'
+        - 'src/__tests__/SchemaBrowserScreen.test.tsx — enables the button when at least one table is selected'
+        - 'src/__tests__/SchemaBrowserScreen.test.tsx — clicking the button populates the prompt in the store'
+    - ac: 2
+      gwt: |
+        Given a SchemaTree, selections, and annotations
+        When `generatePrompt(...)` is invoked
+        Then the output contains the "Here is my database schema:" preamble, one DDL block per selected table, and annotation lines emitted as `--` comments per the worked-example contract.
+      tests:
+        - 'src/__tests__/promptGenerator.test.ts — renders one table with all columns selected'
+        - 'src/__tests__/promptGenerator.test.ts — emits NOT NULL only for non-nullable columns'
+        - 'src/__tests__/promptGenerator.test.ts — emits a single-line column annotation inline with two-space separator'
+        - 'src/__tests__/promptGenerator.test.ts — emits multi-line column annotation with extra lines BEFORE the column'
+        - 'src/__tests__/promptGenerator.test.ts — emits table annotation as -- lines ABOVE CREATE TABLE'
+        - 'src/__tests__/promptGenerator.test.ts — emits PRIMARY KEY clause when PK column is selected'
+        - 'src/__tests__/promptGenerator.test.ts — emits FOREIGN KEY clause when source column is selected'
+        - 'src/__tests__/promptGenerator.test.ts — matches the worked-example output verbatim'
+    - ac: 3
+      gwt: |
+        Given a populated PromptBlock in the store
+        When PromptPreviewScreen renders
+        Then a header with table/column counts, a `<pre aria-label="Generated prompt">` block with `whitespace-pre` class containing the full content, and a CopyButton are visible.
+      tests:
+        - 'src/__tests__/PromptPreviewScreen.test.tsx — renders the populated state with singular table/column counts'
+        - 'src/__tests__/PromptPreviewScreen.test.tsx — uses plural forms when counts are not 1'
+        - 'src/__tests__/PromptPreviewScreen.test.tsx — renders the <pre> with whitespace-pre to preserve DDL indentation'
+        - 'src/__tests__/PromptPreviewScreen.test.tsx — renders the empty state when prompt is null'
+    - ac: 4
+      gwt: |
+        Given a CopyButton with text prop
+        When the user clicks the button
+        Then `navigator.clipboard.writeText(text)` is invoked with the prop value.
+      tests:
+        - 'src/__tests__/CopyButton.test.tsx — calls navigator.clipboard.writeText with the text prop on click and shows "Copied!"'
+        - 'src/__tests__/CopyButton.test.tsx — renders the idle label by default'
+    - ac: 5
+      gwt: |
+        Given a CopyButton in idle state
+        When writeText resolves OR rejects
+        Then the button label transitions to "Copied!" / "Copy failed" with a state-matched icon, the change is announced via `aria-live="polite"`, and the state auto-reverts to idle after 2 seconds.
+      tests:
+        - 'src/__tests__/CopyButton.test.tsx — reverts to idle label after 2 seconds (fake timers)'
+        - 'src/__tests__/CopyButton.test.tsx — shows "Copy failed" when navigator.clipboard.writeText rejects'
+        - 'src/__tests__/CopyButton.test.tsx — reverts from error state to idle after 2 seconds'
+        - 'src/__tests__/CopyButton.test.tsx — does not log warnings when unmounted before the timer fires'
+    - ac: 6
+      gwt: |
+        Given PromptPreviewScreen subscribed to `prompt` via a Zustand field selector
+        When `setPrompt(newBlock)` is invoked with a different selection
+        Then the screen re-renders with the new `content`, `tableCount`, `columnCount`, and `generatedAt` because field-selector reactivity is "free" with this design.
+      tests:
+        - 'src/__tests__/SchemaBrowserScreen.test.tsx — clicking the button populates the prompt in the store (writer side)'
+        - 'src/__tests__/PromptPreviewScreen.test.tsx — renders the populated state with singular table/column counts (reader side)'
+        - 'src/__tests__/promptGenerator.test.ts — iterates tables in schemaTree order regardless of selectedTables insertion order (deterministic output for same selection)'
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'No new IPC surface, no boundary input. `navigator.clipboard.writeText()` runs in Tauri WebView2 secure context per Dev Notes — equivalent rejection semantics to the architected Rust IPC. No password/secret exposure. Architecture deviation explicitly documented with forward-migration path tied to Epic 4.x.'
+  performance:
+    status: PASS
+    notes: 'generatePrompt is a synchronous pure TS function with O(tables × columns) complexity over selected items — sub-ms for any realistic developer-tool schema. Bundle size 240.18 kB JS (gzip 76.92 kB) is within Story 3.2 budget. No async boundary in this story; `isGenerating` is wired for forward-compat with the Rust IPC migration.'
+  reliability:
+    status: PASS
+    notes: 'Empty-selection guard returns canonical empty content. Stale selection keys silently skipped (defensive against deselected tables). Clipboard rejection path renders "Copy failed" without throwing. setTimeout cleanup on unmount via useRef + useEffect prevents post-unmount setState. `clearConnection` correctly resets prompt + isGenerating.'
+  maintainability:
+    status: PASS
+    notes: 'buildAnnotationKey() used throughout per architecture §17.1 — no inline annotation-key construction. Field-selector discipline preserved in all useAppStore() reads. Worked-example verbatim test locks the DDL format so any future format change must explicitly update both code and the gold-standard test. Trailing-comma discipline elegantly implemented via two-pass entries array with lastDataIdx lookup — handles column-last, PK-last, FK-last, and pre-column comment lines correctly.'
+
+top_issues:
+  - id: 'TEST-3.3-001'
+    severity: low
+    finding: 'No test exercises the edge case where `selectedTables` contains a table but `selectedColumns` is empty for it (no columns, no PK columns, no FK source columns selected). This produces `CREATE TABLE schema.tablename (\n);` — empty parens, technically invalid SQL DDL. Unreachable through the UI: `toggleColumn` removes the table key when the last column is unchecked, and the Generate Prompt button is disabled when `selectedTables.size === 0`. Pure defense-in-depth.'
+    suggested_action: 'Optional: add one test to `promptGenerator.test.ts`: seed `selectedTables: new Set(['public.users'])`, `selectedColumns: new Set()`, assert reasonable output (empty parens are acceptable; the contract is "produces deterministic output even for unreachable states").'
+    suggested_owner: dev
+    refs: ['src/lib/promptGenerator.ts:29-104', 'src/__tests__/promptGenerator.test.ts']
+  - id: 'MNT-3.3-001'
+    severity: low
+    finding: '`isGenerating` is wired into the store but never read by any consumer in this story. Dev Notes correctly explain it is included for forward-compat with the Rust IPC async boundary (Epic 4.x). Harmless dead capacity; the `setIsGenerating` setter is exercised only by its own test, not by a consumer. Acceptable per documented intent; flagging for future-context only.'
+    suggested_action: 'No action needed. When Epic 4.x migrates `generatePrompt` to the Rust IPC, the call site in SchemaBrowserScreen will wrap the await in `setIsGenerating(true)` / `setIsGenerating(false)` and a spinner/disabled-state consumer will appear.'
+    suggested_owner: dev
+    refs: ['src/store/appStore.ts:14,40,143', 'docs/stories/3.3.story.md#dev-notes — PromptBlock Data Model']
+  - id: 'TEST-3.3-002'
+    severity: low
+    finding: 'AC #6 ("Regenerating the prompt with a different selection updates the preview immediately") is covered transitively: SchemaBrowserScreen test verifies `setPrompt` is called; PromptPreviewScreen test verifies the screen reads from store. The transition through Zustand reactivity is library-tested. An explicit integration test that renders PromptPreviewScreen, asserts content A, mutates the store to block B, asserts content B would make AC #6 directly traceable rather than transitively.'
+    suggested_action: 'Optional polish: add one test to `PromptPreviewScreen.test.tsx` — seed prompt A, render, assert content A; then `act(() => useAppStore.setState({ prompt: blockB }))`, assert content B is now rendered.'
+    suggested_owner: dev
+    refs: ['src/__tests__/PromptPreviewScreen.test.tsx', 'docs/stories/3.3.story.md#ac-6']
+  - id: 'MNT-3.3-002'
+    severity: low
+    finding: '`EMPTY_CONTENT` constant is returned both at the early-return guard (`selectedTables.size === 0`, line 18-20) AND when the iteration emits no blocks (`blocks.length === 0`, line 109-110). The early-return is technically redundant — the later path would handle the empty case the same way. Defense-in-depth; not harmful.'
+    suggested_action: 'Optional micro-simplification: remove the early-return guard at lines 18-20 and let the iteration fall through to the `blocks.length === 0` branch. Drops one branch from the function. Acceptable to keep as-is for readability.'
+    suggested_owner: dev
+    refs: ['src/lib/promptGenerator.ts:18-20,108-111']
+
+recommendations:
+  immediate: []  # Nothing blocks "Ready for Done"
+  future:
+    - action: 'When Epic 4.1 ("Save & Load Connection Profiles") and Epic 4.2 ("Persist Annotations Across Sessions") land, migrate `generatePrompt` to the architected Rust IPC `generate_prompt({profileId, selectedTables})` per architecture §5.4 and §6.3. Migration is mechanical per Dev Notes: one call site in SchemaBrowserScreen, one adapter in src/commands/index.ts. The 19 promptGenerator tests transfer as the Rust port spec.'
+      refs: ['src/lib/promptGenerator.ts', 'src/screens/SchemaBrowserScreen.tsx:26-31', 'docs/architecture/5-api-specification-tauri-ipc-commands.md#54', 'docs/architecture/6-components.md#63']
+    - action: 'When the Tauri clipboard plugin (`tauri-plugin-clipboard-manager`) is added (post-MVP hardening), swap `navigator.clipboard.writeText(text)` in CopyButton.tsx for `await commands.copyToClipboard(text)` — single-line change. Update `src-tauri/capabilities/default.json` to include `core:clipboard:write-text`.'
+      refs: ['src/components/prompt/CopyButton.tsx:25', 'src-tauri/capabilities/default.json', 'docs/architecture/5-api-specification-tauri-ipc-commands.md#55', 'docs/architecture/15-security-and-performance.md#151']
+
+waiver:
+  active: false

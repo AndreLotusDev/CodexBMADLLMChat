@@ -6,11 +6,16 @@ import { useAppStore } from '@/store/appStore'
 import SchemaTree from '@/components/schema/SchemaTree'
 import SchemaSearchBar from '@/components/schema/SchemaSearchBar'
 import SelectionSummary from '@/components/schema/SelectionSummary'
+import { generatePrompt } from '@/lib/promptGenerator'
 
 const SchemaBrowserScreen: FC = () => {
   const navigate = useNavigate()
   const schemaTree = useAppStore(s => s.schemaTree)
   const clearConnection = useAppStore(s => s.clearConnection)
+  const selectedTables = useAppStore(s => s.selectedTables)
+  const selectedColumns = useAppStore(s => s.selectedColumns)
+  const annotations = useAppStore(s => s.annotations)
+  const setPrompt = useAppStore(s => s.setPrompt)
 
   const handleDisconnect = async () => {
     await commands.disconnect()
@@ -18,13 +23,30 @@ const SchemaBrowserScreen: FC = () => {
     navigate('/connection')
   }
 
+  const handleGeneratePrompt = () => {
+    if (schemaTree === null) return
+    const block = generatePrompt(schemaTree, selectedTables, selectedColumns, annotations)
+    setPrompt(block)
+    navigate('/prompt')
+  }
+
   return (
     <div className="flex flex-col h-full">
       <header className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
         <h1 className="text-lg font-semibold">Schema Browser</h1>
-        <Button variant="outline" size="sm" onClick={handleDisconnect}>
-          Disconnect
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="default"
+            size="sm"
+            disabled={selectedTables.size === 0}
+            onClick={handleGeneratePrompt}
+          >
+            Generate Prompt
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleDisconnect}>
+            Disconnect
+          </Button>
+        </div>
       </header>
 
       {schemaTree !== null && <SchemaSearchBar />}
