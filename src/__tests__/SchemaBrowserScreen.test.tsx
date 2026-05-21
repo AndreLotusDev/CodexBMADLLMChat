@@ -5,6 +5,12 @@ import SchemaBrowserScreen from '../screens/SchemaBrowserScreen'
 import { useAppStore } from '../store/appStore'
 import type { Annotation, SchemaTree } from '../types'
 
+const mockNavigate = vi.fn()
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom')
+  return { ...actual, useNavigate: () => mockNavigate }
+})
+
 vi.mock('@/commands', () => ({
   commands: {
     disconnect: vi.fn().mockResolvedValue(undefined),
@@ -53,10 +59,10 @@ const renderScreen = () =>
     </MemoryRouter>,
   )
 
-describe('SchemaBrowserScreen — Generate Prompt button', () => {
-  it('renders the "Generate Prompt" button and disables it when no selection', () => {
+describe('SchemaBrowserScreen — Next: Compose Prompt button', () => {
+  it('renders the "Next: Compose Prompt" button and disables it when no selection', () => {
     renderScreen()
-    const button = screen.getByRole('button', { name: /Generate Prompt/i })
+    const button = screen.getByRole('button', { name: /Next: Compose Prompt/i })
     expect(button).toBeInTheDocument()
     expect(button).toBeDisabled()
   })
@@ -67,22 +73,20 @@ describe('SchemaBrowserScreen — Generate Prompt button', () => {
       selectedColumns: new Set(['public.users.id', 'public.users.email']),
     })
     renderScreen()
-    const button = screen.getByRole('button', { name: /Generate Prompt/i })
+    const button = screen.getByRole('button', { name: /Next: Compose Prompt/i })
     expect(button).not.toBeDisabled()
   })
 
-  it('clicking the button populates the prompt in the store', () => {
+  // Prompt generation moved to ComposeScreen (brownfield-compose-prompt-rich-text)
+  it('clicking the button navigates to /compose and does NOT call setPrompt', () => {
     useAppStore.setState({
       selectedTables: new Set(['public.users']),
       selectedColumns: new Set(['public.users.id', 'public.users.email']),
     })
     renderScreen()
-    const button = screen.getByRole('button', { name: /Generate Prompt/i })
+    const button = screen.getByRole('button', { name: /Next: Compose Prompt/i })
     fireEvent.click(button)
-    const stored = useAppStore.getState().prompt
-    expect(stored).not.toBeNull()
-    expect(stored?.content).toContain('CREATE TABLE public.users')
-    expect(stored?.tableCount).toBe(1)
-    expect(stored?.columnCount).toBe(2)
+    expect(mockNavigate).toHaveBeenCalledWith('/compose')
+    expect(useAppStore.getState().prompt).toBeNull()
   })
 })

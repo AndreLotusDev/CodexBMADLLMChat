@@ -285,6 +285,41 @@ describe('generatePrompt', () => {
     expect(parsed).toBeLessThanOrEqual(after + 1000)
   })
 
+  it('prepends the query block when query is non-empty', () => {
+    const tree = makeTree()
+    const selectedTables = new Set(['public.users'])
+    const selectedColumns = new Set(['public.users.id'])
+    const { content } = generatePrompt(tree, selectedTables, selectedColumns, new Map(), 'Show me the users.', '')
+    expect(content.startsWith('Show me the users.\n\nHere is my database schema:')).toBe(true)
+  })
+
+  it('appends the expected-output block when expectedOutput is non-empty', () => {
+    const tree = makeTree()
+    const selectedTables = new Set(['public.users'])
+    const selectedColumns = new Set(['public.users.id'])
+    const { content } = generatePrompt(tree, selectedTables, selectedColumns, new Map(), '', 'A single SELECT.')
+    expect(content).toContain('\n\nExpected output:\nA single SELECT.\n')
+    expect(content.endsWith('Expected output:\nA single SELECT.\n')).toBe(true)
+  })
+
+  it('weaves both query and expectedOutput around the schema', () => {
+    const tree = makeTree()
+    const selectedTables = new Set(['public.users'])
+    const selectedColumns = new Set(['public.users.id'])
+    const { content } = generatePrompt(tree, selectedTables, selectedColumns, new Map(), 'Q', 'O')
+    expect(content).toMatch(/^Q\n\nHere is my database schema:[\s\S]+;\n\nExpected output:\nO\n$/)
+  })
+
+  it('whitespace-only query and expectedOutput collapse out', () => {
+    const tree = makeTree()
+    const selectedTables = new Set(['public.users'])
+    const selectedColumns = new Set(['public.users.id'])
+    const { content: empty } = generatePrompt(tree, selectedTables, selectedColumns, new Map(), '   \n\n', '\t')
+    const { content: noArgs } = generatePrompt(tree, selectedTables, selectedColumns, new Map())
+    expect(empty).toBe(noArgs)
+  })
+
+  // Worked-example covers the schema-only baseline; Q/O weaving is covered by the four tests immediately above.
   it('matches the worked-example output verbatim', () => {
     const tree = makeTree()
     const selectedTables = new Set(['public.users', 'public.orders'])

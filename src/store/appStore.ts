@@ -12,6 +12,8 @@ interface AppState {
   selectedColumns: Set<string>
   annotations: Map<string, Annotation>
   prompt: PromptBlock | null
+  query: string
+  expectedOutput: string
   isGenerating: boolean
   savedProfiles: ConnectionProfile[]
   activeProfile: ConnectionProfile | null
@@ -28,6 +30,8 @@ interface AppState {
   setAnnotations: (annotations: Annotation[]) => void
   removeAnnotation: (key: string) => void
   setPrompt: (prompt: PromptBlock | null) => void
+  setQuery: (markdown: string) => void
+  setExpectedOutput: (markdown: string) => void
   setIsGenerating: (v: boolean) => void
   setSavedProfiles: (profiles: ConnectionProfile[]) => void
   setActiveProfile: (profile: ConnectionProfile | null) => void
@@ -46,6 +50,8 @@ export const useAppStore = create<AppState>()((set) => ({
   selectedColumns: new Set<string>(),
   annotations: new Map<string, Annotation>(),
   prompt: null,
+  query: '',
+  expectedOutput: '',
   isGenerating: false,
   savedProfiles: [],
   activeProfile: null,
@@ -62,6 +68,8 @@ export const useAppStore = create<AppState>()((set) => ({
       selectedColumns: new Set<string>(),
       annotations: new Map<string, Annotation>(),
       prompt: null,
+      query: '',
+      expectedOutput: '',
       isGenerating: false,
       activeProfile: null,
     }),
@@ -160,6 +168,8 @@ export const useAppStore = create<AppState>()((set) => ({
       return { annotations: next }
     }),
   setPrompt: (prompt) => set({ prompt }),
+  setQuery: (markdown) => set({ query: markdown }),
+  setExpectedOutput: (markdown) => set({ expectedOutput: markdown }),
   setIsGenerating: (v) => set({ isGenerating: v }),
   setSavedProfiles: (profiles) => set({ savedProfiles: profiles }),
   setActiveProfile: (profile) => set({ activeProfile: profile }),

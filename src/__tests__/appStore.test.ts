@@ -277,6 +277,26 @@ describe('annotation actions', () => {
   })
 })
 
+describe('query / expectedOutput actions', () => {
+  it('setQuery updates the query field', () => {
+    useAppStore.getState().setQuery('**bold**')
+    expect(useAppStore.getState().query).toBe('**bold**')
+  })
+
+  it('setExpectedOutput updates the expectedOutput field', () => {
+    useAppStore.getState().setExpectedOutput('A single SELECT.')
+    expect(useAppStore.getState().expectedOutput).toBe('A single SELECT.')
+  })
+
+  it('clearConnection resets query and expectedOutput', () => {
+    useAppStore.getState().setQuery('some query')
+    useAppStore.getState().setExpectedOutput('some output')
+    useAppStore.getState().clearConnection()
+    expect(useAppStore.getState().query).toBe('')
+    expect(useAppStore.getState().expectedOutput).toBe('')
+  })
+})
+
 describe('prompt actions', () => {
   const sample: PromptBlock = {
     content: 'Here is my database schema:\n\nCREATE TABLE x ();\n',

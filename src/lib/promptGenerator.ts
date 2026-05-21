@@ -12,6 +12,8 @@ export function generatePrompt(
   selectedTables: Set<string>,
   selectedColumns: Set<string>,
   annotations: Map<string, Annotation>,
+  query: string = '',
+  expectedOutput: string = '',
 ): PromptBlock {
   const generatedAt = new Date().toISOString()
 
@@ -105,10 +107,20 @@ export function generatePrompt(
     }
   }
 
-  const content =
+  const schemaContent =
     blocks.length === 0
       ? EMPTY_CONTENT
       : `Here is my database schema:\n\n${blocks.join('\n\n')}\n`
+
+  const trimmedQuery = query.trim()
+  const trimmedOutput = expectedOutput.trim()
+
+  const parts: string[] = []
+  if (trimmedQuery !== '') parts.push(trimmedQuery + '\n')
+  parts.push(schemaContent)
+  if (trimmedOutput !== '') parts.push(`Expected output:\n${trimmedOutput}\n`)
+
+  const content = parts.join('\n')
 
   return { content, tableCount, columnCount, generatedAt }
 }
