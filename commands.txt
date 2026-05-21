@@ -1,0 +1,6 @@
+podman run -d --name postgres-dev -e POSTGRES_USER=admin -e POSTGRES_PASSWORD=admin123 -e POSTGRES_DB=meubanco -p 5432:5432 -v postgres-dev-data:/var/lib/postgresql/data docker.io/postgres:16
+
+
+podman stop postgres-dev
+podman rm -f postgres-dev
+podman volume rm postgres-dev-data
