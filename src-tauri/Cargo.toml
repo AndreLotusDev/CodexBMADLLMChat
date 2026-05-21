@@ -26,7 +26,7 @@ sqlx = { version = "0.7", default-features = false, features = ["runtime-tokio-r
 thiserror = "1"
 tokio = { version = "1", features = ["full"] }
 rusqlite = { version = "0.31", features = ["bundled"] }
-keyring = "3"
+keyring = { version = "3", features = ["windows-native"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 

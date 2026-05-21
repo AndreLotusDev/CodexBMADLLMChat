@@ -52,6 +52,7 @@ function isTauriError(err: unknown): err is TauriCommandError {
 |----------|-----------|
 | SQLite corrupt on startup | Fatal error dialog + exit |
 | WinCred unavailable | `CredentialStoreError` surfaced on connect |
+| Saved-profile password missing from WinCred | `CredentialNotFound` surfaced on connect — user remediation is to re-save the profile |
 | `connection_lost` event | Shell clears state + redirects to Connection screen |
 | Mutex lock poisoned | Surfaces as `Internal` error; user must restart |
 

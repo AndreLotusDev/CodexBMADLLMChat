@@ -11,3 +11,8 @@ vi.mock('@tauri-apps/api/core', () => ({
 vi.mock('@tauri-apps/api/event', () => ({
   listen: vi.fn(() => Promise.resolve(() => {})),
 }))
+
+// Stub the Tauri bridge marker so the `isTauriAvailable()` guard in
+// src/commands/index.ts sees the bridge as present. Tests that need to
+// simulate browser-only mode delete this on `window` per-test.
+;(window as unknown as { __TAURI_INTERNALS__: object }).__TAURI_INTERNALS__ = {}

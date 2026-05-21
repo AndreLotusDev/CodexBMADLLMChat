@@ -1,6 +1,9 @@
 use thiserror::Error;
 use serde::Serialize;
 
+// Serde uses each variant's payload (`(String)` / `(u64)` / unit) as the `message` field
+// reaching the frontend — NOT the `#[error("...")]` Display string. The Display strings
+// here are for `Debug`/logs only. Mutating them does not change user-visible text.
 #[derive(Debug, Error, Serialize)]
 #[serde(tag = "code", content = "message")]
 pub enum AppError {

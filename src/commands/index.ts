@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core'
+import { invoke, type InvokeArgs } from '@tauri-apps/api/core'
 import type {
   Annotation,
   ConnectionProfile,
@@ -7,28 +7,43 @@ import type {
   TestConnectionParams,
   UpsertAnnotationParams,
 } from '../types'
+import {
+  isTauriAvailable,
+  TAURI_BRIDGE_MISSING_CODE,
+  TAURI_BRIDGE_MISSING_MESSAGE,
+} from '../lib/tauriBridge'
+
+function invokeOrReject<T>(name: string, args?: InvokeArgs): Promise<T> {
+  if (!isTauriAvailable()) {
+    return Promise.reject({
+      code: TAURI_BRIDGE_MISSING_CODE,
+      message: TAURI_BRIDGE_MISSING_MESSAGE,
+    })
+  }
+  return args === undefined ? invoke<T>(name) : invoke<T>(name, args)
+}
 
 export const commands = {
   testConnection: (params: TestConnectionParams): Promise<void> =>
-    invoke<void>('test_connection', { ...params }),
+    invokeOrReject<void>('test_connection', { ...params }),
   connectAndExtractSchema: (params: TestConnectionParams): Promise<SchemaTree> =>
-    invoke<SchemaTree>('connect_and_extract_schema', { ...params }),
+    invokeOrReject<SchemaTree>('connect_and_extract_schema', { ...params }),
   disconnect: (): Promise<void> =>
-    invoke<void>('disconnect'),
+    invokeOrReject<void>('disconnect'),
   listProfiles: (): Promise<ConnectionProfile[]> =>
-    invoke<ConnectionProfile[]>('list_profiles'),
+    invokeOrReject<ConnectionProfile[]>('list_profiles'),
   saveProfile: (params: SaveProfileParams): Promise<ConnectionProfile> =>
-    invoke<ConnectionProfile>('save_profile', { ...params }),
+    invokeOrReject<ConnectionProfile>('save_profile', { ...params }),
   deleteProfile: (profileId: string): Promise<void> =>
-    invoke<void>('delete_profile', { profileId }),
+    invokeOrReject<void>('delete_profile', { profileId }),
   renameProfile: (profileId: string, newName: string): Promise<void> =>
-    invoke<void>('rename_profile', { profileId, newName }),
+    invokeOrReject<void>('rename_profile', { profileId, newName }),
   connectWithSavedProfile: (profileId: string): Promise<SchemaTree> =>
-    invoke<SchemaTree>('connect_with_saved_profile', { profileId }),
+    invokeOrReject<SchemaTree>('connect_with_saved_profile', { profileId }),
   loadAnnotations: (profileId: string): Promise<Annotation[]> =>
-    invoke<Annotation[]>('load_annotations', { profileId }),
+    invokeOrReject<Annotation[]>('load_annotations', { profileId }),
   upsertAnnotation: (params: UpsertAnnotationParams): Promise<Annotation> =>
-    invoke<Annotation>('upsert_annotation', { ...params }),
+    invokeOrReject<Annotation>('upsert_annotation', { ...params }),
   deleteAnnotation: (annotationId: string): Promise<void> =>
-    invoke<void>('delete_annotation', { annotationId }),
+    invokeOrReject<void>('delete_annotation', { annotationId }),
 }

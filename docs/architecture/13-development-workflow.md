@@ -40,6 +40,8 @@ cp .env.example .env.local
 npm run tauri dev
 
 # Frontend only (browser — for UI iteration)
+# The frontend will display a banner indicating the Tauri IPC bridge is
+# unavailable; database actions are intentionally disabled in this mode.
 npm run dev
 
 # Build production .exe installer

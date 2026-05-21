@@ -5,6 +5,13 @@
 use keyring::Entry;
 use crate::errors::AppError;
 
+// Actionable user-facing message returned when a saved profile's password is missing
+// from Windows Credential Manager (the keyring entry was deleted, never written, or
+// the SQLite row was copied across machines). Single source of truth for AC1.
+const MISSING_CREDENTIAL_MESSAGE: &str =
+    "This profile's password is missing from Windows Credential Manager. \
+     Re-save this profile from the Connection screen to restore its password.";
+
 pub struct CredentialStore {
     service_name: String,
 }
@@ -24,8 +31,19 @@ impl CredentialStore {
     pub fn retrieve(&self, profile_id: &str) -> Result<String, AppError> {
         let entry = Entry::new(&self.service_name, profile_id)
             .map_err(|e| AppError::CredentialStoreError(e.to_string()))?;
-        entry.get_password()
-            .map_err(|e| AppError::CredentialNotFound(e.to_string()))
+        match entry.get_password() {
+            Ok(password) => Ok(password),
+            // Exact-variant match — the keyring crate guarantees NoEntry across platforms,
+            // so we never fall back to substring inspection of the underlying error text.
+            Err(keyring::Error::NoEntry) => {
+                Err(AppError::CredentialNotFound(MISSING_CREDENTIAL_MESSAGE.to_string()))
+            }
+            // Any other failure (PlatformFailure, NoStorageAccess, ...) is an OS-level
+            // problem the user cannot remediate by re-saving — route to CredentialStoreError.
+            Err(e) => Err(AppError::CredentialStoreError(
+                format!("Could not access Windows Credential Manager: {e}")
+            )),
+        }
     }
 
     pub fn delete(&self, profile_id: &str) -> Result<(), AppError> {
@@ -52,7 +70,22 @@ mod tests {
         store.store(&profile_id, "secret123").unwrap();
         assert_eq!(store.retrieve(&profile_id).unwrap(), "secret123");
         store.delete(&profile_id).unwrap();
-        assert!(matches!(store.retrieve(&profile_id), Err(AppError::CredentialNotFound(_))));
+        // Lock in the AC1 payload contract: after the entry is gone, retrieve must
+        // surface CredentialNotFound with an actionable message that points the user
+        // at re-saving from the Connection screen.
+        match store.retrieve(&profile_id) {
+            Err(AppError::CredentialNotFound(msg)) => {
+                assert!(
+                    msg.contains("Re-save") && msg.contains("Connection"),
+                    "expected actionable remediation text, got: {msg}"
+                );
+                assert!(
+                    !msg.contains("No matching entry found in secure storage"),
+                    "raw keyring crate text must not leak into the payload: {msg}"
+                );
+            }
+            other => panic!("expected CredentialNotFound, got {other:?}"),
+        }
     }
 
     #[test]
